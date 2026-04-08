@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: jira-clone-api
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /health
+    envVars:
+      - key: SPRING_DATA_MONGODB_URI
+        sync: false
+    buildFilter:
+      paths:
+        - server/**
+        - render.yaml
