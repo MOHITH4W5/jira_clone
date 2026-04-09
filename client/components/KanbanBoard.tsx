@@ -27,8 +27,16 @@ const STATUS_COLUMNS = [
   { id: "DONE", title: "Done" },
 ];
 
-const KanbanBoard = () => {
-  const { selectedProject } = useAuth();
+type KanbanBoardProps = {
+  onlyMyIssues?: boolean;
+  recentlyUpdated?: boolean;
+};
+
+const KanbanBoard = ({
+  onlyMyIssues = false,
+  recentlyUpdated = false,
+}: KanbanBoardProps) => {
+  const { selectedProject, user } = useAuth();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search")?.toLowerCase() || "";
 
@@ -36,8 +44,6 @@ const KanbanBoard = () => {
   const [activeIssue, setActiveIssue] = useState<any | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // ✅ FIX: stable mount flag for portal
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -46,21 +52,18 @@ const KanbanBoard = () => {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor),
   );
 
-  /* =====================
-     Fetch issues
-  ===================== */
   const fetchIssues = async () => {
     if (!selectedProject?.id) return;
 
     try {
       setLoading(true);
       const res = await axiosInstance.get(
-        `/api/issues/project/${selectedProject.id}`
+        `/api/issues/project/${selectedProject.id}`,
       );
-      setIssues(res.data);
+      setIssues(res.data || []);
     } catch (err) {
       console.error("Failed to load issues", err);
     } finally {
@@ -72,9 +75,6 @@ const KanbanBoard = () => {
     fetchIssues();
   }, [selectedProject?.id]);
 
-  /* =====================
-     Drag handlers
-  ===================== */
   const onDragStart = (event: DragStartEvent) => {
     const issue = issues.find((i) => i.id === event.active.id);
     setActiveIssue(issue || null);
@@ -99,10 +99,7 @@ const KanbanBoard = () => {
     };
 
     try {
-      // Optimistic update
-      setIssues((prev) =>
-        prev.map((i) => (i.id === issueId ? updatedIssue : i))
-      );
+      setIssues((prev) => prev.map((i) => (i.id === issueId ? updatedIssue : i)));
 
       await axiosInstance.put(`/api/issues/${issueId}`, {
         title: updatedIssue.title,
@@ -132,6 +129,16 @@ const KanbanBoard = () => {
     );
   }
 
+  const filteredIssues = issues.filter((issue) => {
+    const matchesSearch =
+      issue?.title?.toLowerCase().includes(searchQuery) ||
+      issue?.key?.toLowerCase().includes(searchQuery);
+    if (!matchesSearch) return false;
+
+    if (!onlyMyIssues) return true;
+    return issue.assigneeId === user?.id || issue.reporterId === user?.id;
+  });
+
   return (
     <DndContext
       sensors={sensors}
@@ -141,19 +148,21 @@ const KanbanBoard = () => {
     >
       {loading ? (
         <div className="flex h-full items-center justify-center text-sm text-[#6B778C]">
-          Loading board…
+          Loading board...
         </div>
       ) : (
         <div className="flex h-full gap-4 pb-4">
           {STATUS_COLUMNS.map((column) => {
-            const columnIssues = issues
+            const columnIssues = filteredIssues
               .filter((i) => i.status === column.id)
-              .filter(
-                (issue) =>
-                  issue?.title?.toLowerCase().includes(searchQuery) ||
-                  issue?.key?.toLowerCase().includes(searchQuery)
-              )
-              .sort((a, b) => a.order - b.order);
+              .sort((a, b) => {
+                if (recentlyUpdated) {
+                  const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                  const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                  return bTime - aTime;
+                }
+                return (a.order ?? 0) - (b.order ?? 0);
+              });
 
             return (
               <KanbanColumn
@@ -167,14 +176,12 @@ const KanbanBoard = () => {
         </div>
       )}
 
-      {/* Issue Modal */}
       <IssueModel
         issue={selectedIssue}
         isOpen={!!selectedIssue}
         onClose={() => setSelectedIssue(null)}
       />
 
-      {/* ✅ FIXED: stable DragOverlay portal */}
       {isMounted &&
         !loading &&
         createPortal(
@@ -185,11 +192,9 @@ const KanbanBoard = () => {
               }),
             }}
           >
-            {activeIssue ? (
-              <KanbanCard issue={activeIssue} isOverlay />
-            ) : null}
+            {activeIssue ? <KanbanCard issue={activeIssue} isOverlay /> : null}
           </DragOverlay>,
-          document.body
+          document.body,
         )}
     </DndContext>
   );

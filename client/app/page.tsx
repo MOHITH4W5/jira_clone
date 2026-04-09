@@ -13,6 +13,8 @@ export default function Home() {
   const router = useRouter();
   const { selectedProject } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [onlyMyIssues, setOnlyMyIssues] = useState(false);
+  const [recentlyUpdated, setRecentlyUpdated] = useState(false);
 
   const handleShare = async () => {
     const boardUrl = window.location.href;
@@ -116,14 +118,20 @@ export default function Home() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 rounded-full border-dashed bg-transparent"
+            onClick={() => setOnlyMyIssues((prev) => !prev)}
+            className={`h-8 rounded-full border-dashed bg-transparent ${
+              onlyMyIssues ? "border-[#0052CC] text-[#0052CC]" : ""
+            }`}
           >
             Only My Issues
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 rounded-full border-dashed bg-transparent"
+            onClick={() => setRecentlyUpdated((prev) => !prev)}
+            className={`h-8 rounded-full border-dashed bg-transparent ${
+              recentlyUpdated ? "border-[#0052CC] text-[#0052CC]" : ""
+            }`}
           >
             Recently Updated
           </Button>
@@ -132,7 +140,10 @@ export default function Home() {
 
       <div className="min-h-0 flex-1 overflow-x-auto">
         <Suspense fallback={<div>Loading board...</div>}>
-          <KanbanBoard />
+          <KanbanBoard
+            onlyMyIssues={onlyMyIssues}
+            recentlyUpdated={recentlyUpdated}
+          />
         </Suspense>
       </div>
     </div>
