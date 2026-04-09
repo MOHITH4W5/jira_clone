@@ -1,5 +1,6 @@
 package com.example.jira.controller;
 
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -38,19 +39,28 @@ public class Usercontroller {
     // =========================
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody User user) {
+        String email = normalizeEmail(user.getEmail());
+        String rawPassword = user.getPassword();
 
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+        if (isBlank(email) || isBlank(rawPassword)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Email and password are required"));
+        }
+
+        user.setEmail(email);
+
+        if (userRepository.findByEmail(email).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message", "Email already exists"));
         }
 
         try {
-            user.setPassword(passwordEncoder.encode(user.getPassword()));
+            user.setPassword(passwordEncoder.encode(rawPassword));
             user.setRole(user.getRole() == null ? "USER" : user.getRole());
             User savedUser = userRepository.save(user);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
         } catch (Exception exception) {
-            logger.error("Failed to sign up user {}", user.getEmail(), exception);
+            logger.error("Failed to sign up user {}", email, exception);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to create account"));
         }
@@ -61,8 +71,15 @@ public class Usercontroller {
     // =========================
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User loginRequest) {
+        String email = normalizeEmail(loginRequest.getEmail());
+        String rawPassword = loginRequest.getPassword();
 
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        if (isBlank(email) || isBlank(rawPassword)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Email and password are required"));
+        }
+
+        User user = userRepository.findByEmail(email)
                 .orElse(null);
 
         if (user == null) {
@@ -71,7 +88,7 @@ public class Usercontroller {
         }
 
         if (!passwordEncoder.matches(
-                loginRequest.getPassword(),
+                rawPassword,
                 user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Invalid credentials"));
@@ -120,5 +137,16 @@ public class Usercontroller {
         user.setAvatar(updatedUser.getAvatar());
 
         return userRepository.save(user);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
