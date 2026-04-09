@@ -26,7 +26,7 @@ type AuthContextType = {
   login: (user: User) => void;
   logout: () => void;
   selectedProject: Project | null;
-  setSelectedProject: (Project: Project | null) => void;
+  setSelectedProject: (project: Project | null) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,7 +53,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = () => {
     setUser(null);
+    setSelectedProject(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("selectedProject");
   };
   const handleslecteproject = (project: Project | null) => {
     setSelectedProject(project);

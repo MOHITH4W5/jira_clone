@@ -51,6 +51,7 @@ public class IssueController {
         issue.setStatus(updated.getStatus());
         issue.setPriority(updated.getPriority());
         issue.setAssigneeId(updated.getAssigneeId());
+        issue.setSprintId(updated.getSprintId());
         issue.setOrder(updated.getOrder());
         issue.setUpdatedAt(Instant.now());
         issue.setComments(updated.getComments());

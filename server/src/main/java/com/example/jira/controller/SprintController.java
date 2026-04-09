@@ -111,7 +111,7 @@ public class SprintController {
                 .orElseThrow(() -> new RuntimeException("Issue not found"));
 
         issue.setUpdatedAt(Instant.now());
-        issue.setProjectId(sprintId); // OR add sprintId field if you prefer
+        issue.setSprintId(sprintId);
 
         return issueRepository.save(issue);
     }

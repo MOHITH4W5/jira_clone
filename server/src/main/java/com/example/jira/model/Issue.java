@@ -20,6 +20,7 @@ public class Issue {
     private String status;      
     private String priority;    
     private String projectId;
+    private String sprintId;
     private String reporterId;
     private String assigneeId;
     private int order;
@@ -61,6 +62,9 @@ public class Issue {
 
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
+
+    public String getSprintId() { return sprintId; }
+    public void setSprintId(String sprintId) { this.sprintId = sprintId; }
 
     public String getReporterId() { return reporterId; }
     public void setReporterId(String reporterId) { this.reporterId = reporterId; }
