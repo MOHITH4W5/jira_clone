@@ -1,5 +1,6 @@
 package com.example.jira.controller;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 
@@ -57,6 +58,7 @@ public class Usercontroller {
         try {
             user.setPassword(passwordEncoder.encode(rawPassword));
             user.setRole(user.getRole() == null ? "USER" : user.getRole());
+            user.setLastLoginAt(Instant.now());
             User savedUser = userRepository.save(user);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
         } catch (Exception exception) {
@@ -94,7 +96,9 @@ public class Usercontroller {
                     .body(Map.of("message", "Invalid credentials"));
         }
 
-        return ResponseEntity.ok(user); // later replace with JWT token
+        user.setLastLoginAt(Instant.now());
+        User savedUser = userRepository.save(user);
+        return ResponseEntity.ok(savedUser); // later replace with JWT token
     }
 
     // =========================

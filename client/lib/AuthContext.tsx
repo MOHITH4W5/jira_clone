@@ -9,7 +9,8 @@ type User = {
   role: string;
   avatar?: string;
   group?: string;
-  createdAt?: any;
+  createdAt?: string;
+  lastLoginAt?: string;
 };
 export type Project = {
   id: string;
@@ -24,6 +25,7 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   login: (user: User) => void;
+  updateUser: (user: User) => void;
   logout: () => void;
   selectedProject: Project | null;
   setSelectedProject: (project: Project | null) => void;
@@ -51,6 +53,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("user", JSON.stringify(userData));
   };
 
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+  };
+
   const logout = () => {
     setUser(null);
     setSelectedProject(null);
@@ -71,6 +78,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         isAuthenticated: !!user,
         login,
+        updateUser,
         logout,
         selectedProject,
         setSelectedProject: handleslecteproject,

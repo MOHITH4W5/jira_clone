@@ -20,6 +20,7 @@ public class User {
     private String group;
     private String avatar;
     private Instant createdAt = Instant.now();
+    private Instant lastLoginAt;
 
     public String getId() {
         return id != null ? id.toHexString() : null;
@@ -85,6 +86,14 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(Instant lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
     }
 
 }

@@ -1,4 +1,5 @@
 "use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,57 +11,11 @@ import {
   Plus,
   Share2,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 const page = () => {
-  // const issues = [
-  //   {
-  //     id: "1",
-  //     key: "PS-124",
-  //     title: "Implement user authentication flow",
-  //     description: "Add OAuth and JWT token support",
-  //     type: "TASK",
-  //     status: "TODO",
-  //     priority: "HIGH",
-  //     projectId: "proj-1",
-  //     reporterId: "user-1",
-  //     assigneeId: "user-2",
-  //     order: 0,
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //     comments: [],
-  //   },
-  //   {
-  //     id: "2",
-  //     key: "PS-125",
-  //     title: "Fix critical bug in payment processing",
-  //     description: "Payment gateway timeout issue",
-  //     type: "BUG",
-  //     status: "IN_PROGRESS",
-  //     priority: "HIGH",
-  //     projectId: "proj-1",
-  //     reporterId: "user-1",
-  //     assigneeId: "user-1",
-  //     order: 0,
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //     comments: [],
-  //   },
-  //   {
-  //     id: "3",
-  //     key: "PS-126",
-  //     title: "Design system audit and cleanup",
-  //     type: "STORY",
-  //     status: "TODO",
-  //     priority: "MEDIUM",
-  //     projectId: "proj-1",
-  //     reporterId: "user-2",
-  //     order: 1,
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //     comments: [],
-  //   },
-  // ];
+  const router = useRouter();
   const { selectedProject, user } = useAuth();
 
   const [issues, setIssues] = useState<any[]>([]);
@@ -68,13 +23,10 @@ const page = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
-  /* =====================
-     Fetch backlog data
-  ===================== */
   const fetchData = async () => {
     if (!selectedProject?.id) return;
-
     try {
       setLoading(true);
       const issuesRes = await axiosInstance.get(
@@ -83,8 +35,8 @@ const page = () => {
       const sprintRes = await axiosInstance.get(
         `/api/sprints/project/${selectedProject.id}`,
       );
-      setIssues(issuesRes.data);
-      setActiveSprint(sprintRes.data || null);
+      setIssues(issuesRes.data || []);
+      setActiveSprint((sprintRes.data || [])[0] || null);
     } catch (err) {
       console.error("Failed to load backlog", err);
     } finally {
@@ -96,9 +48,6 @@ const page = () => {
     fetchData();
   }, [selectedProject?.id]);
 
-  /* =====================
-     Create backlog issue
-  ===================== */
   const createIssue = async () => {
     if (!newTitle.trim() || !selectedProject || !user) return;
 
@@ -110,7 +59,7 @@ const page = () => {
         priority: "MEDIUM",
         type: "TASK",
         reporterId: user.id,
-        sprintId: null, // BACKLOG
+        sprintId: null,
       });
 
       setNewTitle("");
@@ -121,56 +70,117 @@ const page = () => {
     }
   };
 
+  const backlogIssues = issues.filter((i) => !i.sprintId);
   const sprintIssues = issues.filter((i) => i.sprintId === activeSprint?.id);
 
-  const backlogIssues = issues.filter((i) => !i.sprintId);
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      window.alert("Backlog link copied to clipboard.");
+    } catch (error) {
+      console.error(error);
+      window.alert("Unable to copy link. Please copy from address bar.");
+    }
+  };
 
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-[#6B778C]">
-        Loading backlog…
+        Loading backlog...
       </div>
     );
   }
+
   return (
-    <div className="flex h-full flex-col p-6 overflow-hidden">
-      {/* Breadcrumb */}
+    <div className="flex h-full flex-col overflow-hidden p-6">
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex items-center gap-2 text-sm text-[#5E6C84]">
-          <span>Projects</span>
+          <button
+            type="button"
+            className="hover:underline"
+            onClick={() => router.push("/projects")}
+          >
+            Projects
+          </button>
           <ChevronRight className="h-4 w-4" />
-          <span>{selectedProject?.name}</span>
+          <button
+            type="button"
+            className="hover:underline"
+            onClick={() => router.push("/projects")}
+          >
+            {selectedProject?.name || "No Project"}
+          </button>
           <ChevronRight className="h-4 w-4" />
           <span>Backlog</span>
         </div>
 
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-[#172B4D]">Backlog</h1>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
+          <div className="relative flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleShare}>
               <Share2 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMenu((prev) => !prev)}
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
+            {showMenu && (
+              <div className="absolute right-0 top-10 z-20 min-w-40 rounded-md border bg-white p-1 shadow-lg">
+                <button
+                  type="button"
+                  className="w-full rounded px-3 py-2 text-left text-sm hover:bg-[#F4F5F7]"
+                  onClick={() => {
+                    setShowMenu(false);
+                    router.push("/");
+                  }}
+                >
+                  Open Board
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded px-3 py-2 text-left text-sm hover:bg-[#F4F5F7]"
+                  onClick={() => {
+                    setShowMenu(false);
+                    router.push("/projects");
+                  }}
+                >
+                  Go to Projects
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded px-3 py-2 text-left text-sm hover:bg-[#F4F5F7]"
+                  onClick={() => {
+                    setShowMenu(false);
+                    fetchData();
+                  }}
+                >
+                  Refresh Backlog
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-        {/* Sprint Section */}
-        {/* {activeSprint && (
+      <div className="flex-1 space-y-6 overflow-y-auto pr-2">
+        {activeSprint && (
           <section>
-            <SprintSection sprint={activeSprint} issues={sprintIssues} />
+            <SectionHeader title={activeSprint.name} count={sprintIssues.length} />
+            <div className="divide-y rounded-b-md border border-t-0">
+              {sprintIssues.map((issue: any) => (
+                <BacklogItem key={issue.id} issue={issue} />
+              ))}
+            </div>
           </section>
-        )} */}
+        )}
 
-        {/* Backlog Section */}
         <section>
           <SectionHeader title="Backlog" count={backlogIssues.length} />
-
-          <div className="border border-t-0 rounded-b-md divide-y">
-            {backlogIssues.map((issue) => (
+          <div className="divide-y rounded-b-md border border-t-0">
+            {backlogIssues.map((issue: any) => (
               <BacklogItem key={issue.id} issue={issue} />
             ))}
 
@@ -184,7 +194,7 @@ const page = () => {
               >
                 <input
                   autoFocus
-                  className="w-full p-1 border-2 border-[#0052CC] rounded text-sm"
+                  className="w-full rounded border-2 border-[#0052CC] p-1 text-sm"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onBlur={() => !newTitle && setIsCreating(false)}
@@ -199,48 +209,39 @@ const page = () => {
     </div>
   );
 };
+
 const SectionHeader = ({ title, count }: any) => (
-  <div className="flex items-center justify-between bg-[#F4F5F7] p-3 rounded-t-md border-b">
+  <div className="rounded-t-md border-b bg-[#F4F5F7] p-3">
     <div className="flex items-center gap-2">
       <ChevronDown className="h-4 w-4" />
       <span className="font-semibold">{title}</span>
-      <span className="text-xs ml-2 text-[#5E6C84]">{count} issues</span>
+      <span className="ml-2 text-xs text-[#5E6C84]">{count} issues</span>
     </div>
   </div>
 );
 
-const SprintSection = ({ sprint, issues }: any) => (
-  <>
-    <SectionHeader title={sprint.name} count={issues.length} />
-    <div className="border border-t-0 rounded-b-md divide-y">
-      {issues.map((issue: any) => (
-        <BacklogItem key={issue.id} issue={issue} />
-      ))}
-    </div>
-  </>
-);
-
 const CreateIssueRow = ({ onClick }: any) => (
-  <div className="p-2 hover:bg-[#F4F5F7] cursor-pointer" onClick={onClick}>
+  <div className="cursor-pointer p-2 hover:bg-[#F4F5F7]" onClick={onClick}>
     <div className="flex items-center gap-2 text-sm text-[#5E6C84]">
       <Plus className="h-4 w-4" />
       Create issue
     </div>
   </div>
 );
+
 const BacklogItem = ({ issue }: any) => {
   const priorityMap = {
     HIGH: "text-red-500",
     MEDIUM: "text-orange-500",
     LOW: "text-blue-500",
-  };
+  } as const;
 
   const priorityColor =
     priorityMap[issue.priority as keyof typeof priorityMap] || "text-gray-500";
 
   return (
-    <div className="flex items-center justify-between p-3 hover:bg-[#F4F5F7] group">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="group flex items-center justify-between p-3 hover:bg-[#F4F5F7]">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="h-4 w-4 rounded bg-blue-500" />
         <span className="text-sm text-[#5E6C84]">{issue.key}</span>
         <span className="truncate">{issue.title}</span>
@@ -258,4 +259,5 @@ const BacklogItem = ({ issue }: any) => {
     </div>
   );
 };
+
 export default page;
