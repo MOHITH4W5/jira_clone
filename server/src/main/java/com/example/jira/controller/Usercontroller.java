@@ -1,7 +1,13 @@
 package com.example.jira.controller;
 
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +25,8 @@ import com.example.jira.repository.UserRepository;
 @RestController
 @RequestMapping("/api/users")
 public class Usercontroller {
+    private static final Logger logger = LoggerFactory.getLogger(Usercontroller.class);
+
     @Autowired
     private UserRepository userRepository;
 
@@ -29,34 +37,47 @@ public class Usercontroller {
     // SIGNUP
     // =========================
     @PostMapping("/signup")
-    public User signup(@RequestBody User user) {
+    public ResponseEntity<?> signup(@RequestBody User user) {
 
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Email already exists"));
         }
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole(user.getRole() == null ? "USER" : user.getRole());
-
-        return userRepository.save(user);
+        try {
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+            user.setRole(user.getRole() == null ? "USER" : user.getRole());
+            User savedUser = userRepository.save(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
+        } catch (Exception exception) {
+            logger.error("Failed to sign up user {}", user.getEmail(), exception);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to create account"));
+        }
     }
 
     // =========================
     // LOGIN
     // =========================
     @PostMapping("/login")
-    public User login(@RequestBody User loginRequest) {
+    public ResponseEntity<?> login(@RequestBody User loginRequest) {
 
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "User not found"));
+        }
 
         if (!passwordEncoder.matches(
                 loginRequest.getPassword(),
                 user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Invalid credentials"));
         }
 
-        return user; // later replace with JWT token
+        return ResponseEntity.ok(user); // later replace with JWT token
     }
 
     // =========================

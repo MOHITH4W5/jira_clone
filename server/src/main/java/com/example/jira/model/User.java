@@ -2,6 +2,7 @@ package com.example.jira.model;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -23,6 +24,7 @@ public class User {
         return id != null ? id.toHexString() : null;
     }
 
+    @JsonIgnore
     public ObjectId getObjectId() {
         return id;
     }
@@ -47,6 +49,7 @@ public class User {
         this.email = email;
     }
 
+    @JsonIgnore
     public String getPassword() {
         return password;
     }
