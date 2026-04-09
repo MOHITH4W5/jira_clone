@@ -5,6 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "projects")
@@ -16,7 +17,7 @@ public class Project {
     private String name;
     private String key;
     private String ownerId;
-    private List<String> memberIds;
+    private List<String> memberIds = new ArrayList<>();
     private String description;
     private Instant createdAt = Instant.now();
 

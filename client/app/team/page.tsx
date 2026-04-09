@@ -1,4 +1,5 @@
 "use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,147 +17,178 @@ import { Mail, Trash2, UserPlus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 const page = () => {
-  const { selectedProject, setSelectedProject } = useAuth();
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const { user, selectedProject, setSelectedProject } = useAuth();
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const fetchMembers = async () => {
-    if (!selectedProject?.id) return;
+
+  const fetchMembers = async (projectId: string) => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get(
-        `/api/projects/${selectedProject?.id}`,
-      );
+      const res = await axiosInstance.get(`/api/projects/${projectId}`);
       setTeamMembers(res.data.members || []);
     } catch (error) {
       console.error(error);
+      setTeamMembers([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const ensureSelectedProject = async () => {
+    if (!user) return;
+    if (selectedProject?.id) {
+      fetchMembers(selectedProject.id);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axiosInstance.get("/api/projects");
+      const userProjects = (res.data || []).filter(
+        (project: any) =>
+          project.ownerId === user.id ||
+          (Array.isArray(project.memberIds) &&
+            project.memberIds.includes(user.id)),
+      );
+
+      if (userProjects.length > 0) {
+        setSelectedProject(userProjects[0]);
+        await fetchMembers(userProjects[0].id);
+      } else {
+        setTeamMembers([]);
+      }
+    } catch (error) {
+      console.error(error);
+      setTeamMembers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchMembers();
-  }, [selectedProject]);
-  // const teamMembers = [
-  //   {
-  //     id: "user-1",
-  //     name: "John Doe",
-  //     email: "john@example.com",
-  //     role: "ADMIN",
-  //     group: "Engineering",
-  //     avatar: "https://i.pravatar.cc/150?u=john",
-  //     createdAt: new Date().toISOString(),
-  //   },
-  //   {
-  //     id: "user-2",
-  //     name: "Jane Smith",
-  //     email: "jane@example.com",
-  //     role: "MEMBER",
-  //     group: "Design",
-  //     avatar: "https://i.pravatar.cc/150?u=jane",
-  //     createdAt: new Date().toISOString(),
-  //   },
-  // ];
+    ensureSelectedProject();
+  }, [user, selectedProject?.id]);
 
   const handleAddmember = async () => {
-    if (!selectedProject) return;
-    const name = prompt("Enter member name:");
+    if (!selectedProject?.id) {
+      alert("Please create/select a project first.");
+      return;
+    }
+
+    const name = window.prompt("Enter member name:");
     if (!name) return;
 
     const email =
-      prompt("Enter member email:") ||
-      `${name.toLowerCase().replace(" ", ".")}@example.com`;
-
+      window.prompt("Enter member email:") ||
+      `${name.toLowerCase().replaceAll(" ", ".")}@example.com`;
     const group =
-      prompt("Enter group (Engineering / Design / Admin):") || "Engineering";
-    const password = email.split("@")[0] + "@123";
+      window.prompt("Enter group (Engineering / Design / Admin):") ||
+      "Engineering";
+    const password = `${email.split("@")[0]}@123`;
     const avatar = `https://i.pravatar.cc/150?u=${email}`;
+
     try {
       setLoading(true);
       const res = await axiosInstance.post("/api/users/signup", {
-        name: name,
-        email: email,
-        password: password,
+        name,
+        email,
+        password,
         role: "MEMBER",
-        group: group,
-        avatar: avatar,
+        group,
+        avatar,
       });
-      const newuser = res.data;
-      const updatedmemberids = Array.from(
-        new Set([...(selectedProject.memberIds || []), newuser.id]),
+      const newUser = res.data;
+      const updatedMemberIds = Array.from(
+        new Set([...(selectedProject.memberIds || []), newUser.id]),
       );
+
       await axiosInstance.put(`/api/projects/${selectedProject.id}`, {
         name: selectedProject.name,
         description: selectedProject.description,
-        memberIds: updatedmemberids,
+        memberIds: updatedMemberIds,
       });
-      setSelectedProject({ ...selectedProject, memberIds: updatedmemberids });
-      await fetchMembers();
+
+      setSelectedProject({ ...selectedProject, memberIds: updatedMemberIds });
+      await fetchMembers(selectedProject.id);
     } catch (error) {
       console.log(error);
+      alert("Unable to add member. Check if this email already exists.");
     } finally {
       setLoading(false);
     }
   };
-  const handleDeleteMember = async (userid: string, name: string) => {
-    if (!selectedProject) return;
-    if (!confirm(`Remove ${name} from project?`)) return;
+
+  const handleDeleteMember = async (userId: string, name: string) => {
+    if (!selectedProject?.id) return;
+    if (!window.confirm(`Remove ${name} from project?`)) return;
+
     try {
       setLoading(true);
-      const updatedmemberids = selectedProject?.memberIds?.filter(
-        (id: string) => id !== userid,
+      const updatedMemberIds = (selectedProject.memberIds || []).filter(
+        (id: string) => id !== userId,
       );
+
       await axiosInstance.put(`/api/projects/${selectedProject.id}`, {
         name: selectedProject.name,
         description: selectedProject.description,
-        memberIds: updatedmemberids,
+        memberIds: updatedMemberIds,
       });
-      setSelectedProject({ ...selectedProject, memberIds: updatedmemberids });
-      await fetchMembers();
+
+      setSelectedProject({ ...selectedProject, memberIds: updatedMemberIds });
+      await fetchMembers(selectedProject.id);
     } catch (error) {
       console.log(error);
     } finally {
       setLoading(false);
     }
   };
+
   const groupMap = new Map<string, any[]>();
   teamMembers.forEach((member: any) => {
-    if (!groupMap.has(member.group)) {
-      groupMap.set(member.group, []);
+    const group = member.group || "Ungrouped";
+    if (!groupMap.has(group)) {
+      groupMap.set(group, []);
     }
-    groupMap.get(member.group)?.push(member);
+    groupMap.get(group)?.push(member);
   });
+
   const groups = Array.from(groupMap.keys());
   const filteredMembers = selectedGroup
     ? teamMembers.filter((member: any) => member.group === selectedGroup)
     : teamMembers;
+
   return (
-    <div className="p-8 h-full flex flex-col bg-[#F4F5F7] relative">
-      {/* Loader */}
+    <div className="relative flex h-full flex-col bg-[#F4F5F7] p-8">
       {loading && (
-        <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-50">
-          <p className="text-sm text-[#6B778C]">Updating team…</p>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/70">
+          <p className="text-sm text-[#6B778C]">Updating team...</p>
         </div>
       )}
 
-      {/* Header */}
       <header className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-[#172B4D]">Team Management</h1>
-          <p className="text-[#5E6C84] text-sm mt-1">
+          <p className="mt-1 text-sm text-[#5E6C84]">
             {teamMembers.length} team members
           </p>
         </div>
         <Button
           className="bg-[#0052CC] text-white hover:bg-[#0747A6]"
           onClick={handleAddmember}
+          disabled={!selectedProject?.id}
         >
           <UserPlus className="mr-2 h-4 w-4" />
           Add Member
         </Button>
       </header>
 
-      {/* Group Filter */}
+      {!selectedProject?.id && (
+        <p className="mb-4 text-sm text-[#6B778C]">
+          Select or create a project to manage members.
+        </p>
+      )}
+
       <div className="mb-6 flex gap-2">
         <Button
           variant={selectedGroup === null ? "default" : "outline"}
@@ -177,10 +209,9 @@ const page = () => {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="flex-1 rounded-lg border bg-white overflow-y-auto">
+      <div className="flex-1 overflow-y-auto rounded-lg border bg-white">
         <Table>
-          <TableHeader className="bg-[#F4F5F7] sticky top-0">
+          <TableHeader className="sticky top-0 bg-[#F4F5F7]">
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
@@ -198,7 +229,7 @@ const page = () => {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={member.avatar} />
-                        <AvatarFallback>{member.name[0]}</AvatarFallback>
+                        <AvatarFallback>{member.name?.[0] || "U"}</AvatarFallback>
                       </Avatar>
                       <span className="font-semibold">{member.name}</span>
                     </div>
@@ -225,7 +256,7 @@ const page = () => {
 
                   <TableCell>
                     <Badge variant="outline" className="bg-[#EBECF0]">
-                      {member.group}
+                      {member.group || "Ungrouped"}
                     </Badge>
                   </TableCell>
 
@@ -243,7 +274,7 @@ const page = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
+                <TableCell colSpan={5} className="py-8 text-center">
                   No members found
                 </TableCell>
               </TableRow>

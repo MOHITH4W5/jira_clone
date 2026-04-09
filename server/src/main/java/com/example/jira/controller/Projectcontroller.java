@@ -1,6 +1,7 @@
 package com.example.jira.controller;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import org.bson.types.ObjectId;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -34,6 +35,12 @@ public class Projectcontroller {
 
     @PostMapping
     public Project createProject(@RequestBody Project project) {
+        if (project.getMemberIds() == null) {
+            project.setMemberIds(new ArrayList<>());
+        }
+        if (project.getOwnerId() != null && !project.getMemberIds().contains(project.getOwnerId())) {
+            project.getMemberIds().add(project.getOwnerId());
+        }
         return projectrepository.save(project);
     }
 
@@ -52,7 +59,8 @@ public class Projectcontroller {
                 .orElse(null);
 
         // Fetch members
-        List<ObjectId> memberObjectIds = project.getMemberIds().stream()
+        List<String> memberIds = project.getMemberIds() == null ? List.of() : project.getMemberIds();
+        List<ObjectId> memberObjectIds = memberIds.stream()
                 .map(ObjectId::new)
                 .toList();
 
@@ -73,7 +81,7 @@ public class Projectcontroller {
 
         project.setName(updated.getName());
         project.setDescription(updated.getDescription());
-        project.setMemberIds(updated.getMemberIds());
+        project.setMemberIds(updated.getMemberIds() == null ? List.of() : updated.getMemberIds());
         return projectrepository.save(project);
     }
 
