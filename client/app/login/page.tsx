@@ -13,6 +13,7 @@ import axiosInstance from "@/lib/Axiosinstance";
 import { AlertCircle, ArrowRight, Car, FolderKanban } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import axios from "axios";
 
 const page = () => {
   const router = useRouter();
@@ -39,6 +40,8 @@ const page = () => {
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
     try {
       if (isSignUp) {
         const res = await axiosInstance.post("/api/users/signup", {
@@ -60,9 +63,22 @@ const page = () => {
         login(user);
         router.push("/");
       }
-    } catch (error: any) {
-      setError(error.response?.data?.message);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const responseData = error.response?.data;
+        const message =
+          typeof responseData === "string"
+            ? responseData
+            : responseData?.message ||
+              error.message ||
+              "Request failed. Please try again.";
+        setError(message);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
       console.log(error);
+    } finally {
+      setIsLoading(false);
     }
   };
   return (
@@ -166,6 +182,7 @@ const page = () => {
                 ? "Already have an account? "
                 : "Don't have an account? "}
               <button
+                type="button"
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setError("");
