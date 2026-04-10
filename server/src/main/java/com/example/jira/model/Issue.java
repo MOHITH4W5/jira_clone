@@ -5,6 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "issues")
@@ -21,9 +22,12 @@ public class Issue {
     private String priority;    
     private String projectId;
     private String sprintId;
+    private String parentIssueId;
+    private List<String> blockedByIssueIds = new ArrayList<>();
     private String reporterId;
     private String assigneeId;
     private int order;
+    private Instant dueDate;
 
     private List<String> comments;
 
@@ -66,6 +70,14 @@ public class Issue {
     public String getSprintId() { return sprintId; }
     public void setSprintId(String sprintId) { this.sprintId = sprintId; }
 
+    public String getParentIssueId() { return parentIssueId; }
+    public void setParentIssueId(String parentIssueId) { this.parentIssueId = parentIssueId; }
+
+    public List<String> getBlockedByIssueIds() { return blockedByIssueIds; }
+    public void setBlockedByIssueIds(List<String> blockedByIssueIds) {
+        this.blockedByIssueIds = blockedByIssueIds == null ? new ArrayList<>() : blockedByIssueIds;
+    }
+
     public String getReporterId() { return reporterId; }
     public void setReporterId(String reporterId) { this.reporterId = reporterId; }
 
@@ -75,10 +87,14 @@ public class Issue {
     public int getOrder() { return order; }
     public void setOrder(int order) { this.order = order; }
 
+    public Instant getDueDate() { return dueDate; }
+    public void setDueDate(Instant dueDate) { this.dueDate = dueDate; }
+
     public List<String> getComments() { return comments; }
     public void setComments(List<String> comments) { this.comments = comments; }
 
     public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }

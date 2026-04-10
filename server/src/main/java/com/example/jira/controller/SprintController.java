@@ -1,9 +1,12 @@
 package com.example.jira.controller;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import com.example.jira.model.Issue;
+import com.example.jira.model.Project;
 import com.example.jira.model.Sprint;
 import com.example.jira.repository.IssueRepository;
+import com.example.jira.repository.Projectrepository;
 import com.example.jira.repository.SprintRepository;
+import com.example.jira.service.NotificationService;
 import org.bson.types.ObjectId;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,12 +20,18 @@ public class SprintController {
 
     private final SprintRepository sprintRepository;
     private final IssueRepository issueRepository;
+    private final Projectrepository projectrepository;
+    private final NotificationService notificationService;
 
     public SprintController(
             SprintRepository sprintRepository,
-            IssueRepository issueRepository) {
+            IssueRepository issueRepository,
+            Projectrepository projectrepository,
+            NotificationService notificationService) {
         this.sprintRepository = sprintRepository;
         this.issueRepository = issueRepository;
+        this.projectrepository = projectrepository;
+        this.notificationService = notificationService;
     }
 
     // =========================
@@ -54,7 +63,9 @@ public class SprintController {
         sprint.setStatus("ACTIVE");
         sprint.setStartDate(Instant.now());
 
-        return sprintRepository.save(sprint);
+        Sprint saved = sprintRepository.save(sprint);
+        notifySprintMembers(saved, "SPRINT_STARTED", "Sprint started: " + saved.getName());
+        return saved;
     }
 
     // =========================
@@ -69,7 +80,9 @@ public class SprintController {
         sprint.setStatus("COMPLETED");
         sprint.setEndDate(Instant.now());
 
-        return sprintRepository.save(sprint);
+        Sprint saved = sprintRepository.save(sprint);
+        notifySprintMembers(saved, "SPRINT_ENDED", "Sprint completed: " + saved.getName());
+        return saved;
     }
 
     // =========================
@@ -114,5 +127,33 @@ public class SprintController {
         issue.setSprintId(sprintId);
 
         return issueRepository.save(issue);
+    }
+
+    private void notifySprintMembers(Sprint sprint, String type, String message) {
+        if (sprint.getProjectId() == null || sprint.getProjectId().isBlank()) {
+            return;
+        }
+        Project project;
+        try {
+            project = projectrepository.findById(new ObjectId(sprint.getProjectId())).orElse(null);
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+        if (project == null || project.getMemberIds() == null) {
+            return;
+        }
+
+        for (String memberId : project.getMemberIds()) {
+            if (memberId == null || memberId.isBlank()) {
+                continue;
+            }
+            notificationService.createNotification(
+                    memberId,
+                    sprint.getProjectId(),
+                    null,
+                    type,
+                    message,
+                    type + "|" + sprint.getId() + "|" + memberId);
+        }
     }
 }

@@ -1,6 +1,9 @@
 client/node_modules
 client/.next
 client/.env
+node_modules/
+/package.json
+/package-lock.json
 server/target
 server/.env
 .vscode

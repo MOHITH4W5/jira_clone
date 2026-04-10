@@ -9,6 +9,9 @@ type User = {
   role: string;
   avatar?: string;
   group?: string;
+  phone?: string;
+  active?: boolean;
+  emailNotificationsEnabled?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
 };

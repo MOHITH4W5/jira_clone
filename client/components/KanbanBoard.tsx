@@ -20,6 +20,7 @@ import KanbanCard from "./KanbanCard";
 import IssueModel from "./IssueModel";
 import axiosInstance from "@/lib/Axiosinstance";
 import { useAuth } from "@/lib/AuthContext";
+import { useProjectRealtime } from "@/lib/useProjectRealtime";
 
 const STATUS_COLUMNS = [
   { id: "TODO", title: "To Do" },
@@ -45,6 +46,7 @@ const KanbanBoard = ({
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -74,6 +76,24 @@ const KanbanBoard = ({
   useEffect(() => {
     fetchIssues();
   }, [selectedProject?.id]);
+
+  useProjectRealtime({
+    projectId: selectedProject?.id,
+    userId: user?.id,
+    onProjectEvent: (event) => {
+      const relevantEventTypes = new Set([
+        "ISSUE_CREATED",
+        "ISSUE_UPDATED",
+        "ISSUE_DELETED",
+      ]);
+      if (event?.eventType && relevantEventTypes.has(event.eventType)) {
+        fetchIssues();
+      }
+    },
+    onPresenceEvent: (event) => {
+      setActiveUsers(event.activeUsers ?? []);
+    },
+  });
 
   const onDragStart = (event: DragStartEvent) => {
     const issue = issues.find((i) => i.id === event.active.id);
@@ -151,28 +171,33 @@ const KanbanBoard = ({
           Loading board...
         </div>
       ) : (
-        <div className="flex h-full gap-4 pb-4">
-          {STATUS_COLUMNS.map((column) => {
-            const columnIssues = filteredIssues
-              .filter((i) => i.status === column.id)
-              .sort((a, b) => {
-                if (recentlyUpdated) {
-                  const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-                  const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-                  return bTime - aTime;
-                }
-                return (a.order ?? 0) - (b.order ?? 0);
-              });
+        <div className="flex h-full flex-col gap-2 pb-4">
+          <p className="text-xs text-[#6B778C]">
+            {activeUsers.length} active user{activeUsers.length === 1 ? "" : "s"} in this project
+          </p>
+          <div className="flex h-full gap-4">
+            {STATUS_COLUMNS.map((column) => {
+              const columnIssues = filteredIssues
+                .filter((i) => i.status === column.id)
+                .sort((a, b) => {
+                  if (recentlyUpdated) {
+                    const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                    const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                    return bTime - aTime;
+                  }
+                  return (a.order ?? 0) - (b.order ?? 0);
+                });
 
-            return (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                issues={columnIssues}
-                onIssueClick={setSelectedIssue}
-              />
-            );
-          })}
+              return (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  issues={columnIssues}
+                  onIssueClick={setSelectedIssue}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 

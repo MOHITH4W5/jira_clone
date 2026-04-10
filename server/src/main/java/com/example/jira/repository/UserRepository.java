@@ -11,6 +11,8 @@ import com.example.jira.model.User;
 public interface UserRepository extends MongoRepository<User, ObjectId> {
 
     Optional<User> findByEmail(String email);
+    Optional<User> findByEmailVerificationToken(String emailVerificationToken);
+    Optional<User> findByPendingEmail(String pendingEmail);
 
     List<User> findByIdIn(List<ObjectId> ids);
 

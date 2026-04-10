@@ -3,7 +3,7 @@ services:
     name: jira-clone-api
     runtime: docker
     plan: free
-    branch: main
+    branch: master
     autoDeploy: true
     dockerfilePath: ./server/Dockerfile
     dockerContext: ./server
@@ -11,6 +11,10 @@ services:
     envVars:
       - key: SPRING_DATA_MONGODB_URI
         sync: false
+      - key: MAIL_ENABLED
+        value: "false"
+      - key: VERIFICATION_BASE_URL
+        value: https://jira-clone-sooty.vercel.app/verify-email
     buildFilter:
       paths:
         - server/**

@@ -55,12 +55,16 @@ public class Projectcontroller {
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
         // Fetch owner
-        User owner = userRepository.findById(new ObjectId(project.getOwnerId()))
-                .orElse(null);
+        User owner = null;
+        if (project.getOwnerId() != null && ObjectId.isValid(project.getOwnerId())) {
+            owner = userRepository.findById(new ObjectId(project.getOwnerId()))
+                    .orElse(null);
+        }
 
         // Fetch members
         List<String> memberIds = project.getMemberIds() == null ? List.of() : project.getMemberIds();
         List<ObjectId> memberObjectIds = memberIds.stream()
+                .filter(ObjectId::isValid)
                 .map(ObjectId::new)
                 .toList();
 
@@ -79,9 +83,19 @@ public class Projectcontroller {
         Project project = projectrepository.findById(new ObjectId(id))
                 .orElseThrow(() -> new RuntimeException("project not found"));
 
-        project.setName(updated.getName());
-        project.setDescription(updated.getDescription());
-        project.setMemberIds(updated.getMemberIds() == null ? List.of() : updated.getMemberIds());
+        if (updated.getName() != null) {
+            project.setName(updated.getName());
+        }
+        if (updated.getDescription() != null) {
+            project.setDescription(updated.getDescription());
+        }
+        List<String> incomingMembers = updated.getMemberIds() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(updated.getMemberIds());
+        if (project.getOwnerId() != null && !incomingMembers.contains(project.getOwnerId())) {
+            incomingMembers.add(project.getOwnerId());
+        }
+        project.setMemberIds(incomingMembers);
         return projectrepository.save(project);
     }
 
