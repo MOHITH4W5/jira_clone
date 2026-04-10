@@ -21,14 +21,10 @@ public class GoogleTokenVerificationService {
     }
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.google.client-id:}")
     private String configuredClientId;
-
-    public GoogleTokenVerificationService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public GoogleUserInfo verifyIdToken(String idToken) {
         if (idToken == null || idToken.isBlank()) {
@@ -79,4 +75,3 @@ public class GoogleTokenVerificationService {
         return value == null ? null : String.valueOf(value);
     }
 }
-

@@ -19,17 +19,13 @@ import java.util.Map;
 public class RecaptchaVerificationService {
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.recaptcha.enabled:false}")
     private boolean recaptchaEnabled;
 
     @Value("${app.recaptcha.secret-key:}")
     private String recaptchaSecretKey;
-
-    public RecaptchaVerificationService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public void verifyOrThrow(String token) {
         if (!recaptchaEnabled) {
@@ -73,4 +69,3 @@ public class RecaptchaVerificationService {
         }
     }
 }
-
