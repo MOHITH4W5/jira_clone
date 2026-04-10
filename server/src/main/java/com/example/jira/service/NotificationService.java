@@ -8,6 +8,7 @@ import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -30,7 +31,7 @@ public class NotificationService {
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             RealtimeEventService realtimeEventService,
-            JavaMailSender mailSender) {
+            @Nullable JavaMailSender mailSender) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
         this.realtimeEventService = realtimeEventService;
@@ -65,6 +66,9 @@ public class NotificationService {
     }
 
     private void sendEmailIfEnabled(String userId, String message) {
+        if (!mailEnabled || mailSender == null) {
+            return;
+        }
         User user;
         try {
             user = userRepository.findById(new ObjectId(userId)).orElse(null);
@@ -72,9 +76,6 @@ public class NotificationService {
             return;
         }
         if (user == null || user.getEmail() == null || !user.isEmailNotificationsEnabled()) {
-            return;
-        }
-        if (!mailEnabled) {
             return;
         }
 
