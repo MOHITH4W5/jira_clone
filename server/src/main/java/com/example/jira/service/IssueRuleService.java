@@ -28,6 +28,7 @@ public class IssueRuleService {
     }
 
     public void validateForUpdate(Issue existing, Issue updated) {
+        enforceExistingSubtaskIntegrity(existing, updated);
         enforceParentRules(updated, existing.getId());
         enforceDependencyRules(updated, existing.getId());
         enforceStatusRules(existing, updated);
@@ -41,6 +42,10 @@ public class IssueRuleService {
 
         if (issue.getParentIssueId() == null || issue.getParentIssueId().isBlank()) {
             return;
+        }
+
+        if (!"SUBTASK".equalsIgnoreCase(issue.getType())) {
+            issue.setType("SUBTASK");
         }
 
         if (currentIssueId != null && currentIssueId.equals(issue.getParentIssueId())) {
@@ -106,6 +111,17 @@ public class IssueRuleService {
             return;
         }
         ensureDependenciesDone(issue.getBlockedByIssueIds(), "Task cannot start until blocking tasks are done");
+    }
+
+    private void enforceExistingSubtaskIntegrity(Issue existing, Issue updated) {
+        if (existing.getParentIssueId() == null || existing.getParentIssueId().isBlank()) {
+            return;
+        }
+        if (updated.getParentIssueId() == null || updated.getParentIssueId().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Subtask cannot exist independently and must keep a parent task");
+        }
     }
 
     private void ensureDependenciesDone(List<String> dependencies, String message) {

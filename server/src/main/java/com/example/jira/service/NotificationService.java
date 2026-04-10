@@ -40,7 +40,7 @@ public class NotificationService {
     public Notification createNotification(String userId, String projectId, String issueId, String type, String message, String dedupeKey) {
         if (dedupeKey != null && !dedupeKey.isBlank()) {
             Optional<Notification> existing = notificationRepository.findFirstByUserIdAndDedupeKeyOrderByCreatedAtDesc(userId, dedupeKey);
-            if (existing.isPresent() && existing.get().getCreatedAt().isAfter(Instant.now().minusSeconds(60))) {
+            if (existing.isPresent()) {
                 return existing.get();
             }
         }
