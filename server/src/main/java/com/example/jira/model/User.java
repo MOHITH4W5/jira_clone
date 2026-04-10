@@ -27,6 +27,8 @@ public class User {
     private String pendingEmail;
     private String emailVerificationToken;
     private Instant emailVerificationExpiresAt;
+    private String passwordResetToken;
+    private Instant passwordResetExpiresAt;
     private Instant createdAt = Instant.now();
     private Instant lastLoginAt;
 
@@ -157,6 +159,24 @@ public class User {
 
     public void setEmailVerificationExpiresAt(Instant emailVerificationExpiresAt) {
         this.emailVerificationExpiresAt = emailVerificationExpiresAt;
+    }
+
+    @JsonIgnore
+    public String getPasswordResetToken() {
+        return passwordResetToken;
+    }
+
+    public void setPasswordResetToken(String passwordResetToken) {
+        this.passwordResetToken = passwordResetToken;
+    }
+
+    @JsonIgnore
+    public Instant getPasswordResetExpiresAt() {
+        return passwordResetExpiresAt;
+    }
+
+    public void setPasswordResetExpiresAt(Instant passwordResetExpiresAt) {
+        this.passwordResetExpiresAt = passwordResetExpiresAt;
     }
 
     public Instant getCreatedAt() {

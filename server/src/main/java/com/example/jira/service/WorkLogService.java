@@ -67,6 +67,7 @@ public class WorkLogService {
         auditLogService.log(
                 "WORK_LOG",
                 saved.getId(),
+                saved.getProjectId(),
                 "UPDATED",
                 actorUserId,
                 "Edited work log for issue " + saved.getIssueId());
@@ -84,6 +85,7 @@ public class WorkLogService {
         auditLogService.log(
                 "WORK_LOG",
                 workLogId,
+                workLog.getProjectId(),
                 "DELETED",
                 actorUserId,
                 "Deleted work log for issue " + workLog.getIssueId());

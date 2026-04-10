@@ -57,4 +57,43 @@ public class ProjectAccessService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a project manager");
         }
     }
+
+    public String normalizeRole(String role) {
+        if (role == null) {
+            return "MEMBER";
+        }
+        return switch (role.trim().toUpperCase()) {
+            case "ADMIN", "PROJECT_MANAGER", "MEMBER", "VIEWER" -> role.trim().toUpperCase();
+            case "USER" -> "MEMBER";
+            default -> "MEMBER";
+        };
+    }
+
+    public String getRole(String userId) {
+        return normalizeRole(getUserOrThrow(userId).getRole());
+    }
+
+    public boolean isViewer(String userId) {
+        return "VIEWER".equals(getRole(userId));
+    }
+
+    public boolean canEditProject(String projectId, String userId) {
+        if (userId == null || userId.isBlank()) {
+            return false;
+        }
+        if (!isProjectMember(projectId, userId)) {
+            return false;
+        }
+        return !isViewer(userId);
+    }
+
+    public void assertProjectReadable(String projectId, String userId) {
+        assertProjectMember(projectId, userId);
+    }
+
+    public void assertProjectWritable(String projectId, String userId) {
+        if (!canEditProject(projectId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User does not have write access to this project");
+        }
+    }
 }

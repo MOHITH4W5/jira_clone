@@ -96,4 +96,21 @@ public class NotificationService {
         notification.setRead(read);
         return notificationRepository.save(notification);
     }
+
+    public long unreadCount(String userId) {
+        return notificationRepository.countByUserIdAndReadFalse(userId);
+    }
+
+    public int markAllRead(String userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        int updated = 0;
+        for (Notification notification : notifications) {
+            if (!notification.isRead()) {
+                notification.setRead(true);
+                notificationRepository.save(notification);
+                updated++;
+            }
+        }
+        return updated;
+    }
 }

@@ -68,6 +68,9 @@ public class Usercontroller {
     @Value("${app.verification.base-url:http://localhost:3000/verify-email}")
     private String verificationBaseUrl;
 
+    @Value("${app.reset-password.base-url:http://localhost:3000/login?resetToken=}")
+    private String resetPasswordBaseUrl;
+
     // =========================
     // SIGNUP
     // =========================
@@ -90,9 +93,10 @@ public class Usercontroller {
 
         try {
             user.setPassword(passwordEncoder.encode(rawPassword));
-            user.setRole(user.getRole() == null ? "USER" : user.getRole());
+            user.setRole(normalizeRole(user.getRole()));
             user.setLastLoginAt(Instant.now());
             User savedUser = userRepository.save(user);
+            sendWelcomeEmail(savedUser.getEmail(), savedUser.getName());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
         } catch (Exception exception) {
             logger.error("Failed to sign up user {}", email, exception);
@@ -109,7 +113,7 @@ public class Usercontroller {
         user.setName(request.name());
         user.setEmail(request.email());
         user.setPassword(request.password());
-        user.setRole("USER");
+        user.setRole("MEMBER");
         user.setGroup(request.group());
         user.setAvatar(request.avatar());
         user.setAuthProvider("LOCAL");
@@ -182,7 +186,7 @@ public class Usercontroller {
             user.setName(info.name() == null || info.name().isBlank() ? "Google User" : info.name());
             user.setEmail(email);
             user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-            user.setRole("USER");
+            user.setRole("MEMBER");
             user.setAvatar(info.picture());
             user.setAuthProvider("GOOGLE");
             user.setGoogleId(info.sub());
@@ -360,6 +364,58 @@ public class Usercontroller {
         return ResponseEntity.ok(savedUser);
     }
 
+    @PostMapping("/request-password-reset")
+    public ResponseEntity<?> requestPasswordReset(@RequestBody Map<String, String> payload) {
+        String email = normalizeEmail(payload.get("email"));
+        if (isBlank(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "email is required"));
+        }
+
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.ok(Map.of("message", "If this email exists, a reset link has been sent."));
+        }
+
+        String token = UUID.randomUUID().toString();
+        user.setPasswordResetToken(token);
+        user.setPasswordResetExpiresAt(Instant.now().plusSeconds(60 * 60));
+        userRepository.save(user);
+        sendPasswordResetEmail(user.getEmail(), token);
+
+        return ResponseEntity.ok(Map.of("message", "If this email exists, a reset link has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> payload) {
+        String token = payload.get("token");
+        String newPassword = payload.get("newPassword");
+
+        if (isBlank(token) || isBlank(newPassword)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "token and newPassword are required"));
+        }
+        if (!STRONG_PASSWORD_PATTERN.matcher(newPassword).matches()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "message",
+                            "Password must be 8+ chars and include uppercase, lowercase, number, and special character"));
+        }
+
+        User user = userRepository.findByPasswordResetToken(token).orElse(null);
+        if (user == null || user.getPasswordResetExpiresAt() == null || user.getPasswordResetExpiresAt().isBefore(Instant.now())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Invalid or expired password reset token"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetExpiresAt(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Password reset successful"));
+    }
+
     @PostMapping("/{id}/change-password")
     public ResponseEntity<?> changePassword(
             @PathVariable String id,
@@ -472,6 +528,17 @@ public class Usercontroller {
         return value == null || value.isBlank();
     }
 
+    private String normalizeRole(String role) {
+        if (role == null) {
+            return "MEMBER";
+        }
+        return switch (role.trim().toUpperCase(Locale.ROOT)) {
+            case "ADMIN", "PROJECT_MANAGER", "MEMBER", "VIEWER" -> role.trim().toUpperCase(Locale.ROOT);
+            case "USER" -> "MEMBER";
+            default -> "MEMBER";
+        };
+    }
+
     private ObjectId parseObjectId(String id) {
         try {
             return new ObjectId(id);
@@ -533,6 +600,40 @@ public class Usercontroller {
             mailSender.send(mail);
         } catch (Exception exception) {
             logger.error("Failed to send verification email to {}", newEmail, exception);
+        }
+    }
+
+    private void sendPasswordResetEmail(String email, String token) {
+        if (!mailEnabled || mailSender == null) {
+            logger.info("Mail disabled or sender unavailable; skipped password reset email for {}", email);
+            return;
+        }
+        String link = resetPasswordBaseUrl
+                + (resetPasswordBaseUrl.contains("token=") ? "" : (resetPasswordBaseUrl.contains("?") ? "&token=" : "?token="))
+                + token;
+        try {
+            SimpleMailMessage mail = new SimpleMailMessage();
+            mail.setTo(email);
+            mail.setSubject("Reset your password");
+            mail.setText("Click this link to reset your password: " + link);
+            mailSender.send(mail);
+        } catch (Exception exception) {
+            logger.error("Failed to send password reset email to {}", email, exception);
+        }
+    }
+
+    private void sendWelcomeEmail(String email, String name) {
+        if (!mailEnabled || mailSender == null) {
+            return;
+        }
+        try {
+            SimpleMailMessage mail = new SimpleMailMessage();
+            mail.setTo(email);
+            mail.setSubject("Welcome to Jira Clone");
+            mail.setText("Hi " + (name == null ? "there" : name) + ", your account has been created successfully.");
+            mailSender.send(mail);
+        } catch (Exception exception) {
+            logger.error("Failed to send welcome email to {}", email, exception);
         }
     }
 }

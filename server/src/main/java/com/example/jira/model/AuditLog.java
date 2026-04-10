@@ -13,6 +13,7 @@ public class AuditLog {
     private ObjectId id;
     private String entityType;
     private String entityId;
+    private String projectId;
     private String action;
     private String performedByUserId;
     private String details;
@@ -52,6 +53,14 @@ public class AuditLog {
 
     public void setAction(String action) {
         this.action = action;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 
     public String getPerformedByUserId() {

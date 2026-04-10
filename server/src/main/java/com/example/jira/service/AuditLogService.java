@@ -14,9 +14,20 @@ public class AuditLogService {
     }
 
     public void log(String entityType, String entityId, String action, String performedByUserId, String details) {
+        log(entityType, entityId, null, action, performedByUserId, details);
+    }
+
+    public void log(
+            String entityType,
+            String entityId,
+            String projectId,
+            String action,
+            String performedByUserId,
+            String details) {
         AuditLog auditLog = new AuditLog();
         auditLog.setEntityType(entityType);
         auditLog.setEntityId(entityId);
+        auditLog.setProjectId(projectId);
         auditLog.setAction(action);
         auditLog.setPerformedByUserId(performedByUserId);
         auditLog.setDetails(details);

@@ -24,6 +24,11 @@ public class NotificationController {
         return notificationService.getByUser(userId);
     }
 
+    @GetMapping("/user/{userId}/unread-count")
+    public Map<String, Long> getUnreadCount(@PathVariable String userId) {
+        return Map.of("unreadCount", notificationService.unreadCount(userId));
+    }
+
     @PutMapping("/{notificationId}/read")
     public ResponseEntity<?> setReadState(
             @PathVariable String notificationId,
@@ -34,5 +39,10 @@ public class NotificationController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }
+    }
+
+    @PutMapping("/user/{userId}/read-all")
+    public Map<String, Integer> markAllRead(@PathVariable String userId) {
+        return Map.of("updated", notificationService.markAllRead(userId));
     }
 }

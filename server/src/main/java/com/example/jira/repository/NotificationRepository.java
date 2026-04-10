@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface NotificationRepository extends MongoRepository<Notification, ObjectId> {
     List<Notification> findByUserIdOrderByCreatedAtDesc(String userId);
+    long countByUserIdAndReadFalse(String userId);
 
     Optional<Notification> findFirstByUserIdAndDedupeKeyOrderByCreatedAtDesc(String userId, String dedupeKey);
 }

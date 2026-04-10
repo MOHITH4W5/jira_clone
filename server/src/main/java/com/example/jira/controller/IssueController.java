@@ -4,8 +4,10 @@ import com.example.jira.model.Issue;
 import com.example.jira.repository.IssueRepository;
 import com.example.jira.repository.WorkLogRepository;
 import com.example.jira.service.AttachmentStorageService;
+import com.example.jira.service.AuditLogService;
 import com.example.jira.service.IssueRuleService;
 import com.example.jira.service.NotificationService;
+import com.example.jira.service.ProjectAccessService;
 import com.example.jira.service.RealtimeEventService;
 import org.bson.types.ObjectId;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,8 @@ public class IssueController {
     private final NotificationService notificationService;
     private final RealtimeEventService realtimeEventService;
     private final AttachmentStorageService attachmentStorageService;
+    private final ProjectAccessService projectAccessService;
+    private final AuditLogService auditLogService;
 
     public IssueController(
             IssueRepository issueRepository,
@@ -36,21 +40,37 @@ public class IssueController {
             IssueRuleService issueRuleService,
             NotificationService notificationService,
             RealtimeEventService realtimeEventService,
-            AttachmentStorageService attachmentStorageService) {
+            AttachmentStorageService attachmentStorageService,
+            ProjectAccessService projectAccessService,
+            AuditLogService auditLogService) {
         this.issueRepository = issueRepository;
         this.workLogRepository = workLogRepository;
         this.issueRuleService = issueRuleService;
         this.notificationService = notificationService;
         this.realtimeEventService = realtimeEventService;
         this.attachmentStorageService = attachmentStorageService;
+        this.projectAccessService = projectAccessService;
+        this.auditLogService = auditLogService;
     }
 
     @PostMapping
-    public ResponseEntity<?> createIssue(@RequestBody Issue issue) {
+    public ResponseEntity<?> createIssue(
+            @RequestBody Issue issue,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        String actorUserId = firstNonBlank(headerUserId, issue.getReporterId(), issue.getAssigneeId());
+        if (actorUserId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "X-User-Id header is required"));
+        }
         try {
             if (issue.getStatus() == null || issue.getStatus().isBlank()) {
                 issue.setStatus("TODO");
             }
+            if (issue.getReporterId() == null || issue.getReporterId().isBlank()) {
+                issue.setReporterId(actorUserId);
+            }
+
+            projectAccessService.assertProjectWritable(issue.getProjectId(), actorUserId);
+
             issue.setUpdatedAt(Instant.now());
             if (issue.getCreatedAt() == null) {
                 issue.setCreatedAt(Instant.now());
@@ -74,6 +94,13 @@ public class IssueController {
                         "You have been assigned issue " + issueLabel(saved),
                         "ASSIGN|" + saved.getId() + "|" + saved.getAssigneeId());
             }
+            auditLogService.log(
+                    "ISSUE",
+                    saved.getId(),
+                    saved.getProjectId(),
+                    "CREATED",
+                    actorUserId,
+                    "Created issue " + issueLabel(saved));
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (ResponseStatusException exception) {
             return ResponseEntity.status(exception.getStatusCode())
@@ -85,27 +112,68 @@ public class IssueController {
     }
 
     @GetMapping("/project/{projectId}")
-    public List<Issue> getIssuesByProject(@PathVariable String projectId) {
-        return issueRepository.findByProjectId(projectId);
+    public ResponseEntity<?> getIssuesByProject(
+            @PathVariable String projectId,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        if (headerUserId != null && !headerUserId.isBlank()) {
+            try {
+                projectAccessService.assertProjectReadable(projectId, headerUserId);
+            } catch (ResponseStatusException exception) {
+                return ResponseEntity.status(exception.getStatusCode()).body(Map.of("message", exception.getReason()));
+            }
+        }
+        return ResponseEntity.ok(issueRepository.findByProjectId(projectId));
     }
 
     @GetMapping("/{id}")
-    public Issue getIssueById(@PathVariable String id) {
-        return issueRepository.findById(new ObjectId(id))
+    public ResponseEntity<?> getIssueById(
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        Issue issue = issueRepository.findById(new ObjectId(id))
                 .orElseThrow(() -> new RuntimeException("Issue not found"));
+        if (headerUserId != null && !headerUserId.isBlank()) {
+            try {
+                projectAccessService.assertProjectReadable(issue.getProjectId(), headerUserId);
+            } catch (ResponseStatusException exception) {
+                return ResponseEntity.status(exception.getStatusCode()).body(Map.of("message", exception.getReason()));
+            }
+        }
+        return ResponseEntity.ok(issue);
     }
 
     @GetMapping("/{id}/subtasks")
-    public List<Issue> getSubtasks(@PathVariable String id) {
-        return issueRepository.findByParentIssueId(id);
+    public ResponseEntity<?> getSubtasks(
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        Issue issue = issueRepository.findById(new ObjectId(id))
+                .orElseThrow(() -> new RuntimeException("Issue not found"));
+        if (headerUserId != null && !headerUserId.isBlank()) {
+            try {
+                projectAccessService.assertProjectReadable(issue.getProjectId(), headerUserId);
+            } catch (ResponseStatusException exception) {
+                return ResponseEntity.status(exception.getStatusCode()).body(Map.of("message", exception.getReason()));
+            }
+        }
+        return ResponseEntity.ok(issueRepository.findByParentIssueId(id));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateIssue(
             @PathVariable String id,
-            @RequestBody Issue updated) {
+            @RequestBody Issue updated,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        String actorUserId = firstNonBlank(headerUserId, updated.getReporterId(), updated.getAssigneeId());
+        if (actorUserId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "X-User-Id header is required"));
+        }
         Issue current = issueRepository.findById(new ObjectId(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        try {
+            projectAccessService.assertProjectWritable(current.getProjectId(), actorUserId);
+        } catch (ResponseStatusException exception) {
+            return ResponseEntity.status(exception.getStatusCode()).body(Map.of("message", exception.getReason()));
+        }
 
         if (updated.getUpdatedAt() != null
                 && current.getUpdatedAt() != null
@@ -133,14 +201,32 @@ public class IssueController {
                 "ISSUE_UPDATED",
                 saved.getId(),
                 Map.of("status", saved.getStatus(), "assigneeId", String.valueOf(saved.getAssigneeId())));
+        auditLogService.log(
+                "ISSUE",
+                saved.getId(),
+                saved.getProjectId(),
+                "UPDATED",
+                actorUserId,
+                "Updated issue " + issueLabel(saved));
 
         return ResponseEntity.ok(saved);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteIssue(@PathVariable String id) {
+    public ResponseEntity<?> deleteIssue(
+            @PathVariable String id,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        if (headerUserId == null || headerUserId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "X-User-Id header is required"));
+        }
         Issue issue = issueRepository.findById(new ObjectId(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+        try {
+            projectAccessService.assertProjectWritable(issue.getProjectId(), headerUserId);
+        } catch (ResponseStatusException exception) {
+            return ResponseEntity.status(exception.getStatusCode()).body(Map.of("message", exception.getReason()));
+        }
 
         realtimeEventService.publishProjectEvent(
                 issue.getProjectId(),
@@ -148,6 +234,13 @@ public class IssueController {
                 issue.getId(),
                 Map.of("status", issue.getStatus()));
         deleteIssueCascade(issue.getId());
+        auditLogService.log(
+                "ISSUE",
+                issue.getId(),
+                issue.getProjectId(),
+                "DELETED",
+                headerUserId,
+                "Deleted issue " + issueLabel(issue));
         return ResponseEntity.noContent().build();
     }
 
@@ -297,5 +390,14 @@ public class IssueController {
         if (updated.getKey() != null) {
             current.setKey(updated.getKey());
         }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

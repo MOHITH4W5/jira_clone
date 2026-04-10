@@ -31,16 +31,19 @@ public class AttachmentStorageService {
     private final AttachmentRepository attachmentRepository;
     private final IssueRepository issueRepository;
     private final ProjectAccessService projectAccessService;
+    private final AuditLogService auditLogService;
     private final Path rootDir;
 
     public AttachmentStorageService(
             AttachmentRepository attachmentRepository,
             IssueRepository issueRepository,
             ProjectAccessService projectAccessService,
+            AuditLogService auditLogService,
             @Value("${app.attachments.dir:uploads/attachments}") String rootDir) {
         this.attachmentRepository = attachmentRepository;
         this.issueRepository = issueRepository;
         this.projectAccessService = projectAccessService;
+        this.auditLogService = auditLogService;
         this.rootDir = Paths.get(rootDir).toAbsolutePath().normalize();
         ensureDirectoryExists(this.rootDir);
     }
@@ -48,7 +51,7 @@ public class AttachmentStorageService {
     public Attachment saveAttachment(String issueId, String userId, MultipartFile file) {
         Issue issue = issueRepository.findById(new ObjectId(issueId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
-        projectAccessService.assertProjectMember(issue.getProjectId(), userId);
+        projectAccessService.assertProjectWritable(issue.getProjectId(), userId);
 
         validateFile(file);
         String originalName = file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename();
@@ -70,7 +73,15 @@ public class AttachmentStorageService {
         attachment.setStoredFileName(storedName);
         attachment.setContentType(file.getContentType());
         attachment.setSizeBytes(file.getSize());
-        return attachmentRepository.save(attachment);
+        Attachment saved = attachmentRepository.save(attachment);
+        auditLogService.log(
+                "ATTACHMENT",
+                saved.getId(),
+                saved.getProjectId(),
+                "UPLOADED",
+                userId,
+                "Uploaded attachment " + saved.getOriginalFileName());
+        return saved;
     }
 
     public List<Attachment> listByIssue(String issueId, String userId) {
@@ -98,9 +109,16 @@ public class AttachmentStorageService {
     public void deleteAttachment(String attachmentId, String userId) {
         Attachment attachment = attachmentRepository.findById(new ObjectId(attachmentId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found"));
-        projectAccessService.assertProjectMember(attachment.getProjectId(), userId);
+        projectAccessService.assertProjectWritable(attachment.getProjectId(), userId);
         deletePhysicalFile(attachment.getStoredFileName());
         attachmentRepository.deleteById(new ObjectId(attachmentId));
+        auditLogService.log(
+                "ATTACHMENT",
+                attachmentId,
+                attachment.getProjectId(),
+                "DELETED",
+                userId,
+                "Deleted attachment " + attachment.getOriginalFileName());
     }
 
     public void deleteByIssueId(String issueId) {

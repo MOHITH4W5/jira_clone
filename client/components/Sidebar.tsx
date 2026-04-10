@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  Bell,
+  BookOpenText,
   ChevronDown,
   FolderKanban,
+  History,
   LayoutDashboard,
   ListTodo,
   LogOut,
@@ -28,6 +31,10 @@ const Sidebar = () => {
   const [loading, setloading] = useState(false);
   const [showprojectmenu, setShowprojectmenu] = useState(false);
   const [showcreateissuemodel, setShowcreateissuemodel] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -51,6 +58,55 @@ const Sidebar = () => {
     };
     fetchProjects();
   }, [user, selectedProject, setSelectedProject]);
+
+  const fetchNotifications = async () => {
+    if (!user?.id) return;
+    try {
+      setNotifLoading(true);
+      const [notifRes, countRes] = await Promise.all([
+        axiosInstance.get(`/api/notifications/user/${user.id}`),
+        axiosInstance.get(`/api/notifications/user/${user.id}/unread-count`),
+      ]);
+      setNotifications(notifRes.data || []);
+      setUnreadCount(Number(countRes.data?.unreadCount || 0));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchNotifications();
+    const timer = window.setInterval(fetchNotifications, 45000);
+    return () => window.clearInterval(timer);
+  }, [user?.id]);
+
+  const markNotificationRead = async (notificationId: string) => {
+    try {
+      await axiosInstance.put(`/api/notifications/${notificationId}/read?read=true`);
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notificationId ? { ...item, read: true } : item,
+        ),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!user?.id) return;
+    try {
+      await axiosInstance.put(`/api/notifications/user/${user.id}/read-all`);
+      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   if (loading) {
     return (
@@ -76,6 +132,61 @@ const Sidebar = () => {
         <span className="text-xl font-bold tracking-tight text-[#172B4D]">
           Jira Clone
         </span>
+        <div className="ml-auto relative">
+          <button
+            type="button"
+            onClick={() => {
+              setShowNotifications((prev) => !prev);
+              if (!showNotifications) {
+                fetchNotifications();
+              }
+            }}
+            className="relative rounded p-1 text-[#42526E] hover:bg-[#EBECF0]"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-[#DE350B] px-1.5 text-[10px] text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          {showNotifications && (
+            <div className="absolute right-0 top-8 z-50 w-80 rounded border border-[#DFE1E6] bg-white shadow-lg">
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <p className="text-sm font-semibold text-[#172B4D]">Notifications</p>
+                <button
+                  type="button"
+                  onClick={markAllNotificationsRead}
+                  className="text-xs text-[#0052CC] hover:underline"
+                >
+                  Mark all read
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifLoading ? (
+                  <p className="px-3 py-3 text-xs text-[#6B778C]">Loading notifications...</p>
+                ) : notifications.length === 0 ? (
+                  <p className="px-3 py-3 text-xs text-[#6B778C]">No notifications</p>
+                ) : (
+                  notifications.slice(0, 20).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => !item.read && markNotificationRead(item.id)}
+                      className={`w-full border-b px-3 py-2 text-left hover:bg-[#F4F5F7] ${
+                        item.read ? "bg-white" : "bg-[#DEEBFF]/50"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-[#172B4D]">{item.type}</p>
+                      <p className="text-xs text-[#42526E]">{item.message}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {selectedProject && (
@@ -162,6 +273,16 @@ const Sidebar = () => {
             href="/profile"
             icon={<Settings className="h-4 w-4" />}
             label="Profile"
+          />
+          <NavItem
+            href="/history"
+            icon={<History className="h-4 w-4" />}
+            label="History"
+          />
+          <NavItem
+            href="/help"
+            icon={<BookOpenText className="h-4 w-4" />}
+            label="Help"
           />
         </nav>
       </div>

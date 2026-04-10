@@ -10,4 +10,24 @@ const axiosInstance = axios.create({
   },
 });
 
+axiosInstance.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) {
+        const user = JSON.parse(raw) as { id?: string; role?: string };
+        if (user?.id) {
+          config.headers["X-User-Id"] = user.id;
+        }
+        if (user?.role) {
+          config.headers["X-User-Role"] = user.role;
+        }
+      }
+    } catch {
+      // ignore malformed local user cache
+    }
+  }
+  return config;
+});
+
 export default axiosInstance;

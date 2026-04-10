@@ -85,6 +85,15 @@ const page = () => {
     const group =
       window.prompt("Enter group (Engineering / Design / Admin):") ||
       "Engineering";
+    const roleInput =
+      window.prompt("Enter role (ADMIN / PROJECT_MANAGER / MEMBER / VIEWER):") ||
+      "MEMBER";
+    const role = roleInput.trim().toUpperCase();
+    const allowedRoles = ["ADMIN", "PROJECT_MANAGER", "MEMBER", "VIEWER"];
+    if (!allowedRoles.includes(role)) {
+      alert("Invalid role. Use ADMIN, PROJECT_MANAGER, MEMBER, or VIEWER.");
+      return;
+    }
     const password = `${email.split("@")[0]}@123`;
     const avatar = `https://i.pravatar.cc/150?u=${email}`;
 
@@ -94,7 +103,7 @@ const page = () => {
         name,
         email,
         password,
-        role: "MEMBER",
+        role,
         group,
         avatar,
       });
@@ -247,6 +256,8 @@ const page = () => {
                       className={
                         member.role === "ADMIN"
                           ? "bg-red-100 text-red-800"
+                          : member.role === "VIEWER"
+                            ? "bg-slate-100 text-slate-700"
                           : "bg-blue-100 text-blue-800"
                       }
                     >
