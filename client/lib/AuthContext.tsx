@@ -7,6 +7,8 @@ type User = {
   name: string;
   email: string;
   role: string;
+  authProvider?: string;
+  googleId?: string;
   avatar?: string;
   group?: string;
   phone?: string;

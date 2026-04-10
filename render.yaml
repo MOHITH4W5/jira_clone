@@ -15,6 +15,12 @@ services:
         value: "false"
       - key: VERIFICATION_BASE_URL
         value: https://jira-clone-sooty.vercel.app/verify-email
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: RECAPTCHA_ENABLED
+        value: "true"
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
     buildFilter:
       paths:
         - server/**

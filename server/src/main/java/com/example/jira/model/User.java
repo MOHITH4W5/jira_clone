@@ -17,6 +17,8 @@ public class User {
     private String email;
     private String password;
     private String role;
+    private String authProvider = "LOCAL";
+    private String googleId;
     private String group;
     private String avatar;
     private String phone;
@@ -72,6 +74,22 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getAuthProvider() {
+        return authProvider;
+    }
+
+    public void setAuthProvider(String authProvider) {
+        this.authProvider = authProvider;
+    }
+
+    public String getGoogleId() {
+        return googleId;
+    }
+
+    public void setGoogleId(String googleId) {
+        this.googleId = googleId;
     }
 
     public String getGroup() {

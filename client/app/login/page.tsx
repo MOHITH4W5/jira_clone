@@ -1,4 +1,6 @@
 "use client";
+
+import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,13 +12,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/Axiosinstance";
-import { AlertCircle, ArrowRight, Car, FolderKanban } from "lucide-react";
+import { AlertCircle, ArrowRight, FolderKanban } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
+import ReCAPTCHA from "react-google-recaptcha";
 
 const page = () => {
   const router = useRouter();
+  const { login } = useAuth();
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -25,7 +33,24 @@ const page = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+
+  const resetCaptcha = () => {
+    recaptchaRef.current?.reset();
+    setRecaptchaToken("");
+  };
+
+  const requireCaptchaToken = () => {
+    if (!recaptchaSiteKey) {
+      return "";
+    }
+    if (!recaptchaToken) {
+      setError("Please complete the reCAPTCHA verification.");
+      return null;
+    }
+    return recaptchaToken;
+  };
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -38,49 +63,100 @@ const page = () => {
     }));
     setError("");
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+
     try {
+      const captcha = requireCaptchaToken();
+      if (captcha === null) {
+        setIsLoading(false);
+        return;
+      }
+
       if (isSignUp) {
-        const res = await axiosInstance.post("/api/users/signup", {
+        const res = await axiosInstance.post("/api/users/public-signup", {
           name: formData.name,
           email: formData.email,
           password: formData.password,
           role: "USER",
-          avatar: "https://i.pravatar.cc/150?u=john",
+          avatar: `https://i.pravatar.cc/150?u=${formData.email || "new-user"}`,
+          recaptchaToken: captcha,
         });
-        const user = res.data;
-        login(user);
+        login(res.data);
         router.push("/setup-project");
       } else {
-        const res = await axiosInstance.post("/api/users/login", {
+        const res = await axiosInstance.post("/api/users/public-login", {
           email: formData.email,
           password: formData.password,
+          recaptchaToken: captcha,
         });
-        const user = res.data;
-        login(user);
+        login(res.data);
         router.push("/");
       }
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const responseData = error.response?.data;
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const responseData = err.response?.data;
         const message =
           typeof responseData === "string"
             ? responseData
             : responseData?.message ||
-              error.message ||
+              err.message ||
               "Request failed. Please try again.";
         setError(message);
       } else {
         setError("Something went wrong. Please try again.");
       }
-      console.log(error);
     } finally {
+      resetCaptcha();
       setIsLoading(false);
     }
   };
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    try {
+      setError("");
+      setIsLoading(true);
+
+      const captcha = requireCaptchaToken();
+      if (captcha === null) {
+        setIsLoading(false);
+        return;
+      }
+
+      const idToken = credentialResponse.credential;
+      if (!idToken) {
+        setError("Google login failed: missing credential.");
+        return;
+      }
+
+      const res = await axiosInstance.post("/api/users/google-login", {
+        idToken,
+        recaptchaToken: captcha,
+      });
+      login(res.data);
+      router.push("/");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const responseData = err.response?.data;
+        const message =
+          typeof responseData === "string"
+            ? responseData
+            : responseData?.message ||
+              err.message ||
+              "Google login failed.";
+        setError(message);
+      } else {
+        setError("Google login failed.");
+      }
+    } finally {
+      resetCaptcha();
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-4">
       <div className="w-full max-w-md space-y-8">
@@ -108,7 +184,7 @@ const page = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="flex gap-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -152,20 +228,27 @@ const page = () => {
                 <Input
                   type="password"
                   name="password"
-                  placeholder={
-                    isSignUp ? "At least 6 characters" : "Your password"
-                  }
+                  placeholder={isSignUp ? "At least 8 chars with symbols" : "Your password"}
                   required
                   className="h-10 border-[#DFE1E6] focus-visible:ring-[#0052CC]"
                   value={formData.password}
                   onChange={handleChange}
                 />
-                {isSignUp && (
-                  <p className="text-xs text-[#6B778C]">
-                    Password must be at least 6 characters
-                  </p>
-                )}
               </div>
+
+              {recaptchaSiteKey ? (
+                <div className="pt-1">
+                  <ReCAPTCHA
+                    ref={recaptchaRef}
+                    sitekey={recaptchaSiteKey}
+                    onChange={(token) => setRecaptchaToken(token || "")}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-[#6B778C]">
+                  reCAPTCHA site key not configured. Set `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`.
+                </p>
+              )}
 
               <Button
                 type="submit"
@@ -177,6 +260,31 @@ const page = () => {
               </Button>
             </form>
 
+            {googleClientId ? (
+              <div className="mt-4 space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-[#6B778C]">or continue with</span>
+                  </div>
+                </div>
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setError("Google login failed.")}
+                    text={isSignUp ? "signup_with" : "signin_with"}
+                    shape="pill"
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-center text-xs text-[#6B778C]">
+                Google login not configured. Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+              </p>
+            )}
+
             <div className="mt-6 text-center text-sm text-[#6B778C]">
               {isSignUp
                 ? "Already have an account? "
@@ -187,8 +295,9 @@ const page = () => {
                   setIsSignUp(!isSignUp);
                   setError("");
                   setFormData({ name: "", email: "", password: "" });
+                  resetCaptcha();
                 }}
-                className="text-[#0052CC] hover:underline font-semibold"
+                className="font-semibold text-[#0052CC] hover:underline"
               >
                 {isSignUp ? "Log in" : "Sign up"}
               </button>
@@ -206,3 +315,4 @@ const page = () => {
 };
 
 export default page;
+

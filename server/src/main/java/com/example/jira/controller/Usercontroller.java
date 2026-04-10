@@ -2,6 +2,8 @@ package com.example.jira.controller;
 
 import com.example.jira.model.User;
 import com.example.jira.repository.UserRepository;
+import com.example.jira.service.GoogleTokenVerificationService;
+import com.example.jira.service.RecaptchaVerificationService;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
@@ -51,6 +53,12 @@ public class Usercontroller {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private RecaptchaVerificationService recaptchaVerificationService;
+
+    @Autowired
+    private GoogleTokenVerificationService googleTokenVerificationService;
+
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
@@ -93,6 +101,21 @@ public class Usercontroller {
         }
     }
 
+    @PostMapping("/public-signup")
+    public ResponseEntity<?> publicSignup(@RequestBody PublicSignupRequest request) {
+        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
+
+        User user = new User();
+        user.setName(request.name());
+        user.setEmail(request.email());
+        user.setPassword(request.password());
+        user.setRole("USER");
+        user.setGroup(request.group());
+        user.setAvatar(request.avatar());
+        user.setAuthProvider("LOCAL");
+        return signup(user);
+    }
+
     // =========================
     // LOGIN
     // =========================
@@ -129,6 +152,62 @@ public class Usercontroller {
         user.setLastLoginAt(Instant.now());
         User savedUser = userRepository.save(user);
         return ResponseEntity.ok(savedUser); // later replace with JWT token
+    }
+
+    @PostMapping("/public-login")
+    public ResponseEntity<?> publicLogin(@RequestBody PublicLoginRequest request) {
+        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
+
+        User loginRequest = new User();
+        loginRequest.setEmail(request.email());
+        loginRequest.setPassword(request.password());
+        return login(loginRequest);
+    }
+
+    @PostMapping("/google-login")
+    public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
+        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
+
+        GoogleTokenVerificationService.GoogleUserInfo info =
+                googleTokenVerificationService.verifyIdToken(request.idToken());
+        String email = normalizeEmail(info.email());
+        if (isBlank(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Google account email is missing"));
+        }
+
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            user = new User();
+            user.setName(info.name() == null || info.name().isBlank() ? "Google User" : info.name());
+            user.setEmail(email);
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            user.setRole("USER");
+            user.setAvatar(info.picture());
+            user.setAuthProvider("GOOGLE");
+            user.setGoogleId(info.sub());
+            user.setLastLoginAt(Instant.now());
+            return ResponseEntity.ok(userRepository.save(user));
+        }
+
+        if (!user.isActive()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Account is deactivated"));
+        }
+        user.setLastLoginAt(Instant.now());
+        if (user.getName() == null || user.getName().isBlank()) {
+            user.setName(info.name());
+        }
+        if (user.getAvatar() == null || user.getAvatar().isBlank()) {
+            user.setAvatar(info.picture());
+        }
+        if (user.getGoogleId() == null || user.getGoogleId().isBlank()) {
+            user.setGoogleId(info.sub());
+        }
+        if (user.getAuthProvider() == null || user.getAuthProvider().isBlank()) {
+            user.setAuthProvider("GOOGLE");
+        }
+        return ResponseEntity.ok(userRepository.save(user));
     }
 
     // =========================
@@ -360,6 +439,26 @@ public class Usercontroller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", exception.getMessage()));
         }
+    }
+
+    private record PublicSignupRequest(
+            String name,
+            String email,
+            String password,
+            String group,
+            String avatar,
+            String recaptchaToken) {
+    }
+
+    private record PublicLoginRequest(
+            String email,
+            String password,
+            String recaptchaToken) {
+    }
+
+    private record GoogleLoginRequest(
+            String idToken,
+            String recaptchaToken) {
     }
 
     private String normalizeEmail(String email) {

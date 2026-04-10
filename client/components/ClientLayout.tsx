@@ -12,7 +12,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const publicPages = ["/login", "/setup-project"];
+    const publicPages = ["/login", "/setup-project", "/verify-email"];
     const isPublic = publicPages.includes(pathname);
 
     if (!isAuthenticated && !isPublic) {
