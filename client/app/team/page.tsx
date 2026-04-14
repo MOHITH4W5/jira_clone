@@ -168,22 +168,22 @@ const page = () => {
     : teamMembers;
 
   return (
-    <div className="relative flex h-full flex-col bg-[#F4F5F7] p-8">
+    <div className="relative flex h-full flex-col bg-[#F4F5F7] p-4 md:p-8">
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/70">
           <p className="text-sm text-[#6B778C]">Updating team...</p>
         </div>
       )}
 
-      <header className="mb-8 flex items-center justify-between">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-3 md:mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-[#172B4D]">Team Management</h1>
+          <h1 className="text-2xl font-bold text-[#172B4D] sm:text-3xl">Team Management</h1>
           <p className="mt-1 text-sm text-[#5E6C84]">
             {teamMembers.length} team members
           </p>
         </div>
         <Button
-          className="bg-[#0052CC] text-white hover:bg-[#0747A6]"
+          className="w-full bg-[#0052CC] text-white hover:bg-[#0747A6] sm:w-auto"
           onClick={handleAddmember}
           disabled={!selectedProject?.id}
         >
@@ -198,7 +198,7 @@ const page = () => {
         </p>
       )}
 
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Button
           variant={selectedGroup === null ? "default" : "outline"}
           onClick={() => setSelectedGroup(null)}

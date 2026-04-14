@@ -92,9 +92,9 @@ const page = () => {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-6">
+    <div className="flex h-full flex-col overflow-hidden p-4 md:p-6">
       <div className="mb-6 flex flex-col gap-4">
-        <div className="flex items-center gap-2 text-sm text-[#5E6C84]">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[#5E6C84] sm:text-sm">
           <button
             type="button"
             className="hover:underline"
@@ -114,8 +114,8 @@ const page = () => {
           <span>Backlog</span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-[#172B4D]">Backlog</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-[#172B4D] sm:text-2xl">Backlog</h1>
           <div className="relative flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={handleShare}>
               <Share2 className="h-4 w-4" />
@@ -165,7 +165,7 @@ const page = () => {
         </div>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto pr-2">
+      <div className="flex-1 space-y-6 overflow-y-auto">
         {activeSprint && (
           <section>
             <SectionHeader title={activeSprint.name} count={sprintIssues.length} />
@@ -240,14 +240,14 @@ const BacklogItem = ({ issue }: any) => {
     priorityMap[issue.priority as keyof typeof priorityMap] || "text-gray-500";
 
   return (
-    <div className="group flex items-center justify-between p-3 hover:bg-[#F4F5F7]">
+    <div className="group flex flex-wrap items-center justify-between gap-2 p-3 hover:bg-[#F4F5F7]">
       <div className="flex min-w-0 items-center gap-3">
         <div className="h-4 w-4 rounded bg-blue-500" />
         <span className="text-sm text-[#5E6C84]">{issue.key}</span>
         <span className="truncate">{issue.title}</span>
       </div>
 
-      <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100">
+      <div className="flex items-center gap-3 opacity-100 md:gap-4 md:opacity-0 md:group-hover:opacity-100">
         <span className={`text-xs font-bold ${priorityColor}`}>
           {issue.priority}
         </span>

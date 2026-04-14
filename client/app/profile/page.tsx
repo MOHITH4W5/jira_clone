@@ -206,9 +206,9 @@ const page = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-[#F4F5F7] p-6">
+    <div className="flex h-full flex-col overflow-auto bg-[#F4F5F7] p-4 md:p-6">
       <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold text-[#172B4D]">
+        <h1 className="mb-2 text-2xl font-bold text-[#172B4D] sm:text-3xl">
           Profile Settings
         </h1>
         <p className="text-[#5E6C84]">
@@ -300,7 +300,7 @@ const page = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-[#172B4D]">
                       Role
@@ -349,7 +349,7 @@ const page = () => {
 
                 <div className="flex justify-end pt-4">
                   <Button
-                    className="bg-[#0052CC] text-white hover:bg-[#0747A6]"
+                    className="w-full bg-[#0052CC] text-white hover:bg-[#0747A6] sm:w-auto"
                     onClick={handleSave}
                     disabled={saving}
                   >
@@ -373,7 +373,7 @@ const page = () => {
                 <label className="block text-sm font-semibold text-[#172B4D]">
                   New Email (Requires Verification)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     type="email"
                     value={emailChange}
@@ -384,6 +384,7 @@ const page = () => {
                     variant="outline"
                     onClick={handleRequestEmailChange}
                     disabled={saving}
+                    className="w-full sm:w-auto"
                   >
                     <MailCheck className="mr-2 h-4 w-4" />
                     Send Link
@@ -457,13 +458,13 @@ const page = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex justify-between text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span className="text-[#5E6C84]">Account Created</span>
                   <span className="font-semibold text-[#172B4D]">
                     {formatDate(user?.createdAt)}
                   </span>
                 </div>
-                <div className="flex justify-between border-t pt-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm">
                   <span className="text-[#5E6C84]">Last Login</span>
                   <span className="font-semibold text-[#172B4D]">
                     {formatDateTime(user?.lastLoginAt)}

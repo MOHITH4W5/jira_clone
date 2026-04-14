@@ -28,9 +28,9 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-6">
+    <div className="flex h-full flex-col overflow-hidden p-4 md:p-6">
       <div className="mb-6 flex flex-col gap-4">
-        <div className="flex items-center gap-2 text-sm text-[#5E6C84]">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[#5E6C84] sm:text-sm">
           <button
             onClick={() => router.push("/projects")}
             className="hover:underline"
@@ -50,8 +50,8 @@ export default function Home() {
           <span>Kanban Board</span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-[#172B4D]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-[#172B4D] sm:text-2xl">
             Kanban Board
           </h1>
           <div className="relative flex items-center gap-2">
@@ -103,7 +103,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <div className="flex -space-x-2">
             {[1, 2, 3, 4].map((i) => (
               <Avatar
@@ -119,7 +119,7 @@ export default function Home() {
             variant="outline"
             size="sm"
             onClick={() => setOnlyMyIssues((prev) => !prev)}
-            className={`h-8 rounded-full border-dashed bg-transparent ${
+            className={`h-8 rounded-full border-dashed bg-transparent px-3 text-xs sm:text-sm ${
               onlyMyIssues ? "border-[#0052CC] text-[#0052CC]" : ""
             }`}
           >
@@ -129,7 +129,7 @@ export default function Home() {
             variant="outline"
             size="sm"
             onClick={() => setRecentlyUpdated((prev) => !prev)}
-            className={`h-8 rounded-full border-dashed bg-transparent ${
+            className={`h-8 rounded-full border-dashed bg-transparent px-3 text-xs sm:text-sm ${
               recentlyUpdated ? "border-[#0052CC] text-[#0052CC]" : ""
             }`}
           >

@@ -107,14 +107,14 @@ const page = () => {
   const pieColors = ["#0052CC", "#36B37E", "#FFAB00"];
 
   return (
-    <div className="flex h-full flex-col overflow-auto p-6">
+    <div className="flex h-full flex-col overflow-auto p-4 md:p-6">
       <div className="mb-6">
-        <h1 className="mb-2 text-3xl font-bold text-[#172B4D]">Projects</h1>
+        <h1 className="mb-2 text-2xl font-bold text-[#172B4D] sm:text-3xl">Projects</h1>
         <p className="text-[#5E6C84]">Manage and view all your projects</p>
       </div>
 
       <Button
-        className="mb-6 w-fit bg-[#0052CC] text-white hover:bg-[#0747A6]"
+        className="mb-6 w-full bg-[#0052CC] text-white hover:bg-[#0747A6] sm:w-fit"
         onClick={() => router.push("/create-project")}
       >
         <Plus className="mr-2 h-4 w-4" />

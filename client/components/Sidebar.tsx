@@ -23,8 +23,14 @@ import { Button } from "./ui/button";
 import CreateIssuemodel from "./CreateIssuemodel";
 import { useAuth } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/Axiosinstance";
+import { cn } from "@/lib/utils";
 
-const Sidebar = () => {
+type SidebarProps = {
+  className?: string;
+  onNavigate?: () => void;
+};
+
+const Sidebar = ({ className, onNavigate }: SidebarProps) => {
   const router = useRouter();
   const { user, logout, selectedProject, setSelectedProject } = useAuth();
   const [project, setProject] = useState<any[]>([]);
@@ -122,9 +128,15 @@ const Sidebar = () => {
   const HandleLogout = () => {
     logout();
     router.push("/login");
+    onNavigate?.();
   };
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-[#F4F5F7] text-[#42526E]">
+    <div
+      className={cn(
+        "flex h-screen w-64 flex-col border-r bg-[#F4F5F7] text-[#42526E]",
+        className,
+      )}
+    >
       <div className="flex items-center gap-2 p-4 pt-6">
         <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0052CC] text-white">
           <FolderKanban className="h-5 w-5" />
@@ -152,7 +164,7 @@ const Sidebar = () => {
             )}
           </button>
           {showNotifications && (
-            <div className="absolute right-0 top-8 z-50 w-80 rounded border border-[#DFE1E6] bg-white shadow-lg">
+            <div className="absolute right-0 top-8 z-50 w-[min(20rem,calc(100vw-2rem))] rounded border border-[#DFE1E6] bg-white shadow-lg">
               <div className="flex items-center justify-between border-b px-3 py-2">
                 <p className="text-sm font-semibold text-[#172B4D]">Notifications</p>
                 <button
@@ -214,6 +226,7 @@ const Sidebar = () => {
                     onClick={() => {
                       setSelectedProject(project);
                       setShowprojectmenu(false);
+                      onNavigate?.();
                     }}
                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-[#EBECF0] text-[#42526E]"
                   >
@@ -223,7 +236,10 @@ const Sidebar = () => {
                 ))}
                 <div className="border-t px-3 py-2">
                   <button
-                    onClick={redirectproject}
+                    onClick={() => {
+                      redirectproject();
+                      onNavigate?.();
+                    }}
                     className="w-full py-1.5 px-1 text-left text-sm text-[#0052CC] hover:bg-[#EBECF0]"
                   >
                     <span className="flex items-center gap-2">
@@ -253,36 +269,43 @@ const Sidebar = () => {
             href="/"
             icon={<LayoutDashboard className="h-4 w-4" />}
             label="Kanban Board"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/backlog"
             icon={<ListTodo className="h-4 w-4" />}
             label="Backlog"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/projects"
             icon={<FolderKanban className="h-4 w-4" />}
             label="Projects"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/team"
             icon={<Users className="h-4 w-4" />}
             label="Team"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/profile"
             icon={<Settings className="h-4 w-4" />}
             label="Profile"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/history"
             icon={<History className="h-4 w-4" />}
             label="History"
+            onNavigate={onNavigate}
           />
           <NavItem
             href="/help"
             icon={<BookOpenText className="h-4 w-4" />}
             label="Help"
+            onNavigate={onNavigate}
           />
         </nav>
       </div>
@@ -329,10 +352,11 @@ const Sidebar = () => {
 
 export default Sidebar;
 
-function NavItem({ href, icon, label, active }: any) {
+function NavItem({ href, icon, label, active, onNavigate }: any) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={`flex items-center gap-3 rounded px-2 py-1.5 text-sm font-medium transition-colors ${
         active
           ? "bg-[#DEEBFF] text-[#0052CC]"

@@ -59,9 +59,9 @@ const HistoryPage = () => {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-[#F4F5F7] p-6">
+    <div className="flex h-full flex-col overflow-auto bg-[#F4F5F7] p-4 md:p-6">
       <div className="mb-6">
-        <h1 className="mb-2 text-3xl font-bold text-[#172B4D]">History</h1>
+        <h1 className="mb-2 text-2xl font-bold text-[#172B4D] sm:text-3xl">History</h1>
         <p className="text-[#5E6C84]">
           Detailed audit log for {selectedProject.name}
         </p>

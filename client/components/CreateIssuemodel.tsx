@@ -151,7 +151,7 @@ const CreateIssuemodel = ({ isOpen, onClose }: any) => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-[#172B4D]">
                 Type
@@ -204,7 +204,7 @@ const CreateIssuemodel = ({ isOpen, onClose }: any) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex flex-col-reverse justify-end gap-2 border-t pt-4 sm:flex-row">
             <Button variant="outline" onClick={onClose} disabled={isloading}>
               Cancel
             </Button>

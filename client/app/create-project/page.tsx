@@ -84,9 +84,9 @@ export default function Page() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#172B4D]">
+        <h1 className="text-2xl font-bold text-[#172B4D] sm:text-3xl">
           Create a new project
         </h1>
         <p className="text-[#5E6C84] text-sm mt-2">

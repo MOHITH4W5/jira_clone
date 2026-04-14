@@ -186,7 +186,7 @@ const IssueModel = ({ issue, isOpen, onClose }: any) => {
             </div>
 
             {/* Sidebar */}
-            <div className="w-full md:w-[280px] p-6 border-l">
+            <div className="w-full border-t p-6 md:w-[280px] md:border-l md:border-t-0">
               <div className="space-y-5">
                 <div>
                   <h3 className="text-xs font-bold uppercase mb-1">Status</h3>
