@@ -92,10 +92,6 @@ public class Usercontroller {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Please enter a valid email address"));
         }
-        if (!hasDeliverableEmailDomain(email)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
-        }
 
         user.setEmail(email);
 
@@ -120,15 +116,61 @@ public class Usercontroller {
 
     @PostMapping("/public-signup")
     public ResponseEntity<?> publicSignup(@RequestBody PublicSignupRequest request) {
-        User user = new User();
-        user.setName(request.name());
-        user.setEmail(request.email());
-        user.setPassword(request.password());
-        user.setRole("MEMBER");
-        user.setGroup(request.group());
-        user.setAvatar(request.avatar());
-        user.setAuthProvider("LOCAL");
-        return signup(user);
+        String email = normalizeEmail(request.email());
+        String rawPassword = request.password();
+
+        if (isBlank(request.name()) || isBlank(email) || isBlank(rawPassword)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Name, email, and password are required"));
+        }
+        if (!isValidEmailAddress(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Please enter a valid email address"));
+        }
+        if (!hasDeliverableEmailDomain(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
+        }
+        if (!isMailConfigured()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("message", "Signup verification email is not configured. Contact admin."));
+        }
+        if (userRepository.findByEmail(email).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Email already exists"));
+        }
+
+        try {
+            User user = new User();
+            user.setName(request.name().trim());
+            user.setEmail(email);
+            user.setPassword(passwordEncoder.encode(rawPassword));
+            user.setRole("MEMBER");
+            user.setGroup(request.group());
+            user.setAvatar(request.avatar());
+            user.setAuthProvider("LOCAL");
+            user.setActive(false);
+            user.setEmailVerificationToken(UUID.randomUUID().toString());
+            user.setEmailVerificationExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
+            user.setLastLoginAt(null);
+
+            User saved = userRepository.save(user);
+            if (!sendVerificationEmail(
+                    saved.getEmail(),
+                    saved.getEmailVerificationToken(),
+                    "Verify your Jira Clone account",
+                    "Click this link to verify your account email: ")) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("message", "Unable to send verification email. Please try again later."));
+            }
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                    "requiresEmailVerification", true,
+                    "message", "Verification link sent. Please verify your email before logging in."));
+        } catch (Exception exception) {
+            logger.error("Failed to create public signup account for {}", email, exception);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to create account"));
+        }
     }
 
     // =========================
@@ -157,6 +199,10 @@ public class Usercontroller {
         }
 
         if (!user.isActive()) {
+            if (!isBlank(user.getEmailVerificationToken())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Please verify your email before logging in"));
+            }
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Account is deactivated"));
         }
@@ -323,6 +369,10 @@ public class Usercontroller {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
             }
+            if (!isMailConfigured()) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("message", "Email verification is not configured. Contact admin."));
+            }
             if (newEmail.equals(user.getEmail())) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "New email must be different"));
@@ -338,7 +388,14 @@ public class Usercontroller {
             user.setEmailVerificationExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
             userRepository.save(user);
 
-            sendVerificationEmail(newEmail, token);
+            if (!sendVerificationEmail(
+                    newEmail,
+                    token,
+                    "Confirm your email change",
+                    "Click this link to verify your new email: ")) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("message", "Unable to send verification email. Please try again later."));
+            }
             return ResponseEntity.ok(Map.of("message", "Verification link sent to new email"));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -366,17 +423,22 @@ public class Usercontroller {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Verification token is expired"));
         }
+
         if (isBlank(user.getPendingEmail())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "No pending email change found"));
+            user.setActive(true);
+            user.setEmailVerificationToken(null);
+            user.setEmailVerificationExpiresAt(null);
+            userRepository.save(user);
+            return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
         }
 
         user.setEmail(user.getPendingEmail());
         user.setPendingEmail(null);
+        user.setActive(true);
         user.setEmailVerificationToken(null);
         user.setEmailVerificationExpiresAt(null);
-        User savedUser = userRepository.save(user);
-        return ResponseEntity.ok(savedUser);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
     }
 
     @PostMapping("/request-password-reset")
@@ -684,22 +746,24 @@ public class Usercontroller {
         }
     }
 
-    private void sendVerificationEmail(String newEmail, String token) {
+    private boolean sendVerificationEmail(String recipientEmail, String token, String subject, String bodyPrefix) {
         if (!mailEnabled || mailSender == null) {
-            logger.info("Mail disabled or sender unavailable; skipped verification email send for {}", newEmail);
-            return;
+            logger.info("Mail disabled or sender unavailable; skipped verification email send for {}", recipientEmail);
+            return false;
         }
         String link = verificationBaseUrl
                 + (verificationBaseUrl.contains("?") ? "&" : "?")
                 + "token=" + token;
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
-            mail.setTo(newEmail);
-            mail.setSubject("Confirm your email change");
-            mail.setText("Click this link to verify your new email: " + link);
+            mail.setTo(recipientEmail);
+            mail.setSubject(subject);
+            mail.setText(bodyPrefix + link);
             mailSender.send(mail);
+            return true;
         } catch (Exception exception) {
-            logger.error("Failed to send verification email to {}", newEmail, exception);
+            logger.error("Failed to send verification email to {}", recipientEmail, exception);
+            return false;
         }
     }
 

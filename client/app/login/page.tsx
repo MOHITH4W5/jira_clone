@@ -142,6 +142,14 @@ const page = () => {
           role: "MEMBER",
           avatar: `https://i.pravatar.cc/150?u=${formData.email || "new-user"}`,
         });
+        if (res.data?.requiresEmailVerification) {
+          setSuccess(
+            res.data?.message ||
+              "Verification link sent. Please verify your email before logging in.",
+          );
+          setIsSignUp(false);
+          return;
+        }
         login(res.data);
         router.push("/setup-project");
       } else {
