@@ -14,17 +14,14 @@ import { useAuth } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/Axiosinstance";
 import { AlertCircle, ArrowRight, FolderKanban } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import ReCAPTCHA from "react-google-recaptcha";
 
 const page = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resetToken = searchParams.get("resetToken") || "";
   const { login } = useAuth();
-  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
-  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   const [isSignUp, setIsSignUp] = useState(false);
@@ -37,23 +34,6 @@ const page = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [recaptchaToken, setRecaptchaToken] = useState("");
-
-  const resetCaptcha = () => {
-    recaptchaRef.current?.reset();
-    setRecaptchaToken("");
-  };
-
-  const requireCaptchaToken = () => {
-    if (!recaptchaSiteKey) {
-      return "";
-    }
-    if (!recaptchaToken) {
-      setError("Please complete the reCAPTCHA verification.");
-      return null;
-    }
-    return recaptchaToken;
-  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -137,12 +117,6 @@ const page = () => {
     setSuccess("");
 
     try {
-      const captcha = requireCaptchaToken();
-      if (captcha === null) {
-        setIsLoading(false);
-        return;
-      }
-
       if (isSignUp) {
         const res = await axiosInstance.post("/api/users/public-signup", {
           name: formData.name,
@@ -150,7 +124,6 @@ const page = () => {
           password: formData.password,
           role: "MEMBER",
           avatar: `https://i.pravatar.cc/150?u=${formData.email || "new-user"}`,
-          recaptchaToken: captcha,
         });
         login(res.data);
         router.push("/setup-project");
@@ -158,7 +131,6 @@ const page = () => {
         const res = await axiosInstance.post("/api/users/public-login", {
           email: formData.email,
           password: formData.password,
-          recaptchaToken: captcha,
         });
         login(res.data);
         router.push("/");
@@ -176,8 +148,8 @@ const page = () => {
       } else {
         setError("Something went wrong. Please try again.");
       }
-    } finally {
-      resetCaptcha();
+    }
+    finally {
       setIsLoading(false);
     }
   };
@@ -187,12 +159,6 @@ const page = () => {
       setError("");
       setIsLoading(true);
 
-      const captcha = requireCaptchaToken();
-      if (captcha === null) {
-        setIsLoading(false);
-        return;
-      }
-
       const idToken = credentialResponse.credential;
       if (!idToken) {
         setError("Google login failed: missing credential.");
@@ -201,7 +167,6 @@ const page = () => {
 
       const res = await axiosInstance.post("/api/users/google-login", {
         idToken,
-        recaptchaToken: captcha,
       });
       login(res.data);
       router.push("/");
@@ -218,8 +183,8 @@ const page = () => {
       } else {
         setError("Google login failed.");
       }
-    } finally {
-      resetCaptcha();
+    }
+    finally {
       setIsLoading(false);
     }
   };
@@ -338,24 +303,6 @@ const page = () => {
                 </>
               )}
 
-              {!resetToken && (
-                <>
-                  {recaptchaSiteKey ? (
-                    <div className="pt-1">
-                      <ReCAPTCHA
-                        ref={recaptchaRef}
-                        sitekey={recaptchaSiteKey}
-                        onChange={(token) => setRecaptchaToken(token || "")}
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[#6B778C]">
-                      reCAPTCHA site key not configured. Set `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`.
-                    </p>
-                  )}
-                </>
-              )}
-
               <Button
                 type="submit"
                 disabled={isLoading}
@@ -432,7 +379,6 @@ const page = () => {
                     setError("");
                     setSuccess("");
                     setFormData({ name: "", email: "", password: "" });
-                    resetCaptcha();
                     setIsResetRequestMode(false);
                   }}
                   className="font-semibold text-[#0052CC] hover:underline"
