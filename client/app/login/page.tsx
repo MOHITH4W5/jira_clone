@@ -17,6 +17,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import axios from "axios";
 
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+
 const page = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,6 +37,17 @@ const page = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const isLikelyValidEmail = (email: string) => {
+    const normalized = email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(normalized)) {
+      return false;
+    }
+    const domain = normalized.split("@")[1] || "";
+    const labels = domain.split(".");
+    const tld = labels[labels.length - 1] || "";
+    return tld.length >= 2 && tld.length <= 24;
+  };
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -50,8 +63,8 @@ const page = () => {
   };
 
   const handleRequestReset = async () => {
-    if (!formData.email) {
-      setError("Enter your email first.");
+    if (!isLikelyValidEmail(formData.email)) {
+      setError("Enter a valid email address first.");
       return;
     }
     try {
@@ -112,6 +125,10 @@ const page = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLikelyValidEmail(formData.email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
     setIsLoading(true);
     setError("");
     setSuccess("");
@@ -280,6 +297,8 @@ const page = () => {
                       name="email"
                       placeholder="name@company.com"
                       required
+                      pattern="[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+"
+                      title="Enter a valid email like name@example.com"
                       className="h-10 border-[#DFE1E6] focus-visible:ring-[#0052CC]"
                       value={formData.email}
                       onChange={handleChange}

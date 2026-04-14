@@ -3,13 +3,18 @@ package com.example.jira.controller;
 import com.example.jira.model.User;
 import com.example.jira.repository.UserRepository;
 import com.example.jira.service.GoogleTokenVerificationService;
-import com.example.jira.service.RecaptchaVerificationService;
 import java.time.Instant;
+import java.util.Hashtable;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import javax.naming.NamingEnumeration;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
 
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -43,7 +48,7 @@ public class Usercontroller {
     private static final Pattern STRONG_PASSWORD_PATTERN =
             Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{8,}$");
     private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$");
     private static final Pattern DATA_IMAGE_PATTERN =
             Pattern.compile("^data:(image/(png|jpeg|jpg));base64,(.+)$");
 
@@ -52,9 +57,6 @@ public class Usercontroller {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private RecaptchaVerificationService recaptchaVerificationService;
 
     @Autowired
     private GoogleTokenVerificationService googleTokenVerificationService;
@@ -71,6 +73,9 @@ public class Usercontroller {
     @Value("${app.reset-password.base-url:http://localhost:3000/login?resetToken=}")
     private String resetPasswordBaseUrl;
 
+    @Value("${app.email.require-deliverable-domain:true}")
+    private boolean requireDeliverableEmailDomain;
+
     // =========================
     // SIGNUP
     // =========================
@@ -82,6 +87,14 @@ public class Usercontroller {
         if (isBlank(email) || isBlank(rawPassword)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Email and password are required"));
+        }
+        if (!isValidEmailAddress(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Please enter a valid email address"));
+        }
+        if (!hasDeliverableEmailDomain(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
         }
 
         user.setEmail(email);
@@ -107,8 +120,6 @@ public class Usercontroller {
 
     @PostMapping("/public-signup")
     public ResponseEntity<?> publicSignup(@RequestBody PublicSignupRequest request) {
-        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
-
         User user = new User();
         user.setName(request.name());
         user.setEmail(request.email());
@@ -131,6 +142,10 @@ public class Usercontroller {
         if (isBlank(email) || isBlank(rawPassword)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Email and password are required"));
+        }
+        if (!isValidEmailAddress(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Please enter a valid email address"));
         }
 
         User user = userRepository.findByEmail(email)
@@ -160,8 +175,6 @@ public class Usercontroller {
 
     @PostMapping("/public-login")
     public ResponseEntity<?> publicLogin(@RequestBody PublicLoginRequest request) {
-        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
-
         User loginRequest = new User();
         loginRequest.setEmail(request.email());
         loginRequest.setPassword(request.password());
@@ -170,14 +183,12 @@ public class Usercontroller {
 
     @PostMapping("/google-login")
     public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
-        recaptchaVerificationService.verifyOrThrow(request.recaptchaToken());
-
         GoogleTokenVerificationService.GoogleUserInfo info =
                 googleTokenVerificationService.verifyIdToken(request.idToken());
         String email = normalizeEmail(info.email());
-        if (isBlank(email)) {
+        if (isBlank(email) || !isValidEmailAddress(email)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Google account email is missing"));
+                    .body(Map.of("message", "Google account email is invalid"));
         }
 
         User user = userRepository.findByEmail(email).orElse(null);
@@ -304,9 +315,13 @@ public class Usercontroller {
             User user = userRepository.findById(parseObjectId(id))
                     .orElseThrow(() -> new RuntimeException("User not found"));
             String newEmail = normalizeEmail(payload.get("newEmail"));
-            if (isBlank(newEmail) || !EMAIL_PATTERN.matcher(newEmail).matches()) {
+            if (!isValidEmailAddress(newEmail)) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("message", "Valid newEmail is required"));
+            }
+            if (!hasDeliverableEmailDomain(newEmail)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
             }
             if (newEmail.equals(user.getEmail())) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -367,9 +382,17 @@ public class Usercontroller {
     @PostMapping("/request-password-reset")
     public ResponseEntity<?> requestPasswordReset(@RequestBody Map<String, String> payload) {
         String email = normalizeEmail(payload.get("email"));
-        if (isBlank(email)) {
+        if (!isValidEmailAddress(email)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "email is required"));
+                    .body(Map.of("message", "A valid email is required"));
+        }
+        if (!isMailConfigured()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("message", "Password reset email is not configured. Contact admin."));
+        }
+        if (!hasDeliverableEmailDomain(email)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Email domain cannot receive mail. Use a real email address"));
         }
 
         User user = userRepository.findByEmail(email).orElse(null);
@@ -381,7 +404,10 @@ public class Usercontroller {
         user.setPasswordResetToken(token);
         user.setPasswordResetExpiresAt(Instant.now().plusSeconds(60 * 60));
         userRepository.save(user);
-        sendPasswordResetEmail(user.getEmail(), token);
+        if (!sendPasswordResetEmail(user.getEmail(), token)) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Unable to send reset link. Please try again later."));
+        }
 
         return ResponseEntity.ok(Map.of("message", "If this email exists, a reset link has been sent."));
     }
@@ -502,19 +528,16 @@ public class Usercontroller {
             String email,
             String password,
             String group,
-            String avatar,
-            String recaptchaToken) {
+            String avatar) {
     }
 
     private record PublicLoginRequest(
             String email,
-            String password,
-            String recaptchaToken) {
+            String password) {
     }
 
     private record GoogleLoginRequest(
-            String idToken,
-            String recaptchaToken) {
+            String idToken) {
     }
 
     private String normalizeEmail(String email) {
@@ -526,6 +549,83 @@ public class Usercontroller {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean isMailConfigured() {
+        return mailEnabled && mailSender != null;
+    }
+
+    private boolean isValidEmailAddress(String email) {
+        if (isBlank(email)) {
+            return false;
+        }
+        if (email.length() > 254 || !EMAIL_PATTERN.matcher(email).matches()) {
+            return false;
+        }
+        String[] parts = email.split("@", 2);
+        if (parts.length != 2) {
+            return false;
+        }
+        String local = parts[0];
+        String domain = parts[1];
+        if (local.length() > 64 || domain.length() > 253) {
+            return false;
+        }
+        if (local.startsWith(".") || local.endsWith(".") || local.contains("..")) {
+            return false;
+        }
+        if (domain.startsWith(".") || domain.endsWith(".") || domain.contains("..")) {
+            return false;
+        }
+        String[] labels = domain.split("\\.");
+        if (labels.length < 2) {
+            return false;
+        }
+        String tld = labels[labels.length - 1];
+        if (tld.length() < 2 || tld.length() > 24) {
+            return false;
+        }
+        return tld.chars().allMatch(Character::isLetter);
+    }
+
+    private boolean hasDeliverableEmailDomain(String email) {
+        if (!requireDeliverableEmailDomain) {
+            return true;
+        }
+        String[] parts = email.split("@", 2);
+        if (parts.length != 2) {
+            return false;
+        }
+        return hasMxRecord(parts[1]);
+    }
+
+    private boolean hasMxRecord(String domain) {
+        try {
+            Hashtable<String, String> env = new Hashtable<>();
+            env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
+            env.put("java.naming.provider.url", "dns:");
+            DirContext context = new InitialDirContext(env);
+            Attributes attributes = context.getAttributes(domain, new String[] {"MX"});
+            Attribute mx = attributes.get("MX");
+            if (mx == null || mx.size() == 0) {
+                return false;
+            }
+            NamingEnumeration<?> all = mx.getAll();
+            try {
+                while (all.hasMore()) {
+                    Object value = all.next();
+                    if (value != null && !value.toString().isBlank()) {
+                        return true;
+                    }
+                }
+            } finally {
+                all.close();
+            }
+            return false;
+        } catch (Exception exception) {
+            logger.warn("MX lookup failed for domain {}", domain, exception);
+            return false;
+        }
     }
 
     private String normalizeRole(String role) {
@@ -603,10 +703,10 @@ public class Usercontroller {
         }
     }
 
-    private void sendPasswordResetEmail(String email, String token) {
+    private boolean sendPasswordResetEmail(String email, String token) {
         if (!mailEnabled || mailSender == null) {
             logger.info("Mail disabled or sender unavailable; skipped password reset email for {}", email);
-            return;
+            return false;
         }
         String link = resetPasswordBaseUrl
                 + (resetPasswordBaseUrl.contains("token=") ? "" : (resetPasswordBaseUrl.contains("?") ? "&token=" : "?token="))
@@ -617,8 +717,10 @@ public class Usercontroller {
             mail.setSubject("Reset your password");
             mail.setText("Click this link to reset your password: " + link);
             mailSender.send(mail);
+            return true;
         } catch (Exception exception) {
             logger.error("Failed to send password reset email to {}", email, exception);
+            return false;
         }
     }
 
