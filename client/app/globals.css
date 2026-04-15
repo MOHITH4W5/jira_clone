@@ -160,12 +160,12 @@
 
   .reveal-on-scroll {
     opacity: 0;
-    transform: translate3d(0, 18px, 0) scale(0.985);
-    filter: blur(5px);
+    transform: translate3d(0, 26px, 0) scale(0.97);
+    filter: blur(7px);
     transition:
-      opacity 560ms ease,
-      transform 560ms ease,
-      filter 560ms ease;
+      opacity 760ms cubic-bezier(0.18, 1, 0.3, 1),
+      transform 760ms cubic-bezier(0.18, 1, 0.3, 1),
+      filter 760ms cubic-bezier(0.18, 1, 0.3, 1);
     transition-delay: var(--reveal-delay, 0ms);
   }
 
@@ -175,13 +175,30 @@
     filter: blur(0);
   }
 
-  .text-reveal-scroll {
-    background-image: linear-gradient(95deg, #172b4d 35%, #0c66e4 62%, #172b4d 88%);
+  .text-reveal-shell {
+    position: relative;
+    display: inline-block;
+    line-height: 1.1;
+  }
+
+  .text-reveal-base {
+    color: #8b96ab;
+  }
+
+  .text-reveal-overlay {
+    position: absolute;
+    inset: 0;
+    color: #172b4d;
+    background-image: linear-gradient(95deg, #172b4d 30%, #0c66e4 58%, #172b4d 92%);
     background-size: 220% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: text-reveal-shimmer 5s ease-in-out infinite;
+    clip-path: inset(
+      0 calc((1 - var(--title-reveal-progress, 0)) * 100%) 0 0
+    );
+    transition: clip-path 180ms linear;
+    animation: text-reveal-shimmer 6s ease-in-out infinite;
   }
 
   .parallax-orb {
@@ -190,6 +207,7 @@
     filter: blur(1px);
     pointer-events: none;
     will-change: transform;
+    transition: transform 120ms linear;
   }
 
   .parallax-orb-1 {
@@ -197,6 +215,11 @@
     top: -50px;
     height: 240px;
     width: 240px;
+    transform: translate3d(
+      calc(var(--parallax-x-1, 0px) + var(--cursor-drift-x, 0px)),
+      calc(var(--parallax-y-1, 0px) + var(--cursor-drift-y, 0px)),
+      0
+    );
     background: radial-gradient(
       circle,
       rgba(12, 102, 228, 0.2) 0%,
@@ -209,6 +232,11 @@
     top: 220px;
     height: 300px;
     width: 300px;
+    transform: translate3d(
+      calc(var(--parallax-x-2, 0px) - var(--cursor-drift-x, 0px) * 0.45),
+      calc(var(--parallax-y-2, 0px) - var(--cursor-drift-y, 0px) * 0.45),
+      0
+    );
     background: radial-gradient(
       circle,
       rgba(54, 179, 126, 0.18) 0%,
@@ -232,7 +260,8 @@
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll,
   .skeuo-pill-btn,
-  .text-reveal-scroll {
+  .text-reveal-overlay,
+  .parallax-orb {
     animation: none !important;
     transition: none !important;
     transform: none !important;

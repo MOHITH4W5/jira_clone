@@ -14,19 +14,83 @@ export default function Home() {
   const [onlyMyIssues, setOnlyMyIssues] = useState(false);
   const [recentlyUpdated, setRecentlyUpdated] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [parallaxOffset, setParallaxOffset] = useState(0);
+  const titleOverlayRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     const root = scrollContainerRef.current;
     if (!root) return;
 
-    const handleScroll = () => {
-      setParallaxOffset(root.scrollTop);
+    let frame = 0;
+    let latestSource: HTMLElement | null = root;
+
+    const updateScrollAnimations = () => {
+      const maxScroll = Math.max(1, root.scrollHeight - root.clientHeight);
+      const sourceTop = latestSource?.scrollTop ?? root.scrollTop;
+      const sourceLeft = latestSource?.scrollLeft ?? root.scrollLeft;
+      const motionValue = Math.abs(sourceTop) + Math.abs(sourceLeft);
+      const progress = Math.min(1, motionValue / Math.max(160, maxScroll * 0.35));
+
+      root.style.setProperty("--parallax-y-1", `${sourceTop * 0.22}px`);
+      root.style.setProperty("--parallax-y-2", `${sourceTop * -0.14}px`);
+      root.style.setProperty("--parallax-x-1", `${sourceLeft * 0.08}px`);
+      root.style.setProperty("--parallax-x-2", `${sourceLeft * -0.05}px`);
+
+      if (titleOverlayRef.current) {
+        titleOverlayRef.current.style.setProperty(
+          "--title-reveal-progress",
+          progress.toFixed(3),
+        );
+      }
     };
 
-    handleScroll();
-    root.addEventListener("scroll", handleScroll, { passive: true });
-    return () => root.removeEventListener("scroll", handleScroll);
+    const onScroll = (event: Event) => {
+      latestSource =
+        event.target instanceof HTMLElement ? event.target : root;
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
+      frame = requestAnimationFrame(updateScrollAnimations);
+    };
+
+    updateScrollAnimations();
+    root.addEventListener("scroll", onScroll, {
+      passive: true,
+      capture: true,
+    });
+
+    return () => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
+      root.removeEventListener("scroll", onScroll, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!root) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = root.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const relativeX = (event.clientX - rect.left) / rect.width - 0.5;
+      const relativeY = (event.clientY - rect.top) / rect.height - 0.5;
+      root.style.setProperty("--cursor-drift-x", `${relativeX * 20}px`);
+      root.style.setProperty("--cursor-drift-y", `${relativeY * 14}px`);
+    };
+
+    const onPointerLeave = () => {
+      root.style.setProperty("--cursor-drift-x", "0px");
+      root.style.setProperty("--cursor-drift-y", "0px");
+    };
+
+    root.addEventListener("pointermove", onPointerMove, { passive: true });
+    root.addEventListener("pointerleave", onPointerLeave);
+
+    return () => {
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerleave", onPointerLeave);
+    };
   }, []);
 
   useEffect(() => {
@@ -43,8 +107,8 @@ export default function Home() {
       },
       {
         root,
-        threshold: 0.16,
-        rootMargin: "0px 0px -8% 0px",
+        threshold: 0.18,
+        rootMargin: "0px 0px -10% 0px",
       },
     );
 
@@ -74,14 +138,8 @@ export default function Home() {
       className="relative flex h-full flex-col overflow-y-auto p-4 md:p-6"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="parallax-orb parallax-orb-1"
-          style={{ transform: `translate3d(0, ${parallaxOffset * 0.18}px, 0)` }}
-        />
-        <div
-          className="parallax-orb parallax-orb-2"
-          style={{ transform: `translate3d(0, ${parallaxOffset * -0.12}px, 0)` }}
-        />
+        <div className="parallax-orb parallax-orb-1" />
+        <div className="parallax-orb parallax-orb-2" />
       </div>
 
       <div className="relative z-10 flex h-full flex-col">
@@ -113,8 +171,11 @@ export default function Home() {
             data-reveal
             className="reveal-on-scroll flex flex-wrap items-center justify-between gap-3"
           >
-            <h1 className="text-reveal-scroll text-xl font-semibold text-[#172B4D] sm:text-2xl">
-              Kanban Board
+            <h1 className="text-reveal-shell text-xl font-semibold sm:text-2xl">
+              <span className="text-reveal-base">Kanban Board</span>
+              <span ref={titleOverlayRef} className="text-reveal-overlay">
+                Kanban Board
+              </span>
             </h1>
             <div className="relative flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={handleShare}>

@@ -13,7 +13,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import KanbanColumn from "./KanbanColumn";
 import { createPortal } from "react-dom";
 import KanbanCard from "./KanbanCard";
@@ -47,6 +47,7 @@ const KanbanBoard = ({
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
+  const columnsViewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,6 +77,35 @@ const KanbanBoard = ({
   useEffect(() => {
     fetchIssues();
   }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (loading) return;
+    const root = columnsViewportRef.current;
+    if (!root) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      {
+        root,
+        threshold: 0.18,
+        rootMargin: "0px -4% 0px -4%",
+      },
+    );
+
+    const columns = root.querySelectorAll<HTMLElement>("[data-column-reveal]");
+    columns.forEach((column, index) => {
+      column.style.setProperty("--reveal-delay", `${Math.min(index * 120, 280)}ms`);
+      observer.observe(column);
+    });
+
+    return () => observer.disconnect();
+  }, [loading, issues.length, onlyMyIssues, recentlyUpdated, searchQuery]);
 
   useProjectRealtime({
     projectId: selectedProject?.id,
@@ -175,8 +205,8 @@ const KanbanBoard = ({
           <p className="text-xs text-[#6B778C]">
             {activeUsers.length} active user{activeUsers.length === 1 ? "" : "s"} in this project
           </p>
-          <div className="flex h-full gap-4">
-            {STATUS_COLUMNS.map((column) => {
+          <div ref={columnsViewportRef} className="flex h-full gap-4 overflow-x-auto">
+            {STATUS_COLUMNS.map((column, index) => {
               const columnIssues = filteredIssues
                 .filter((i) => i.status === column.id)
                 .sort((a, b) => {
@@ -192,6 +222,7 @@ const KanbanBoard = ({
                 <KanbanColumn
                   key={column.id}
                   column={column}
+                  columnIndex={index}
                   issues={columnIssues}
                   onIssueClick={setSelectedIssue}
                 />

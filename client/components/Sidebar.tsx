@@ -16,7 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Input } from "./ui/input";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -44,6 +44,13 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
   const [notifLoading, setNotifLoading] = useState(false);
   const notifPanelRef = useRef<HTMLDivElement | null>(null);
   const notifButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [notifPanelStyle, setNotifPanelStyle] = useState<CSSProperties>({
+    position: "fixed",
+    top: 88,
+    left: 12,
+    width: 320,
+    zIndex: 80,
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -91,6 +98,44 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
     const timer = window.setInterval(fetchNotifications, 45000);
     return () => window.clearInterval(timer);
   }, [user?.id]);
+
+  const updateNotifPanelPosition = () => {
+    const anchor = notifButtonRef.current;
+    if (!anchor) return;
+
+    const rect = anchor.getBoundingClientRect();
+    const viewportPadding = 12;
+    const panelWidth = Math.min(352, window.innerWidth - viewportPadding * 2);
+    let left = rect.right - panelWidth;
+    left = Math.max(viewportPadding, Math.min(left, window.innerWidth - panelWidth - viewportPadding));
+
+    const top = Math.min(
+      rect.bottom + 10,
+      window.innerHeight - 120,
+    );
+
+    setNotifPanelStyle({
+      position: "fixed",
+      top,
+      left,
+      width: panelWidth,
+      zIndex: 80,
+    });
+  };
+
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    updateNotifPanelPosition();
+    const handleViewportChange = () => updateNotifPanelPosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [showNotifications]);
 
   useEffect(() => {
     if (!showNotifications) return;
@@ -204,17 +249,10 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
             )}
           </button>
           {showNotifications && (
-            <button
-              type="button"
-              className="fixed inset-0 z-40 bg-black/20 lg:hidden"
-              aria-label="Close notifications overlay"
-              onClick={() => setShowNotifications(false)}
-            />
-          )}
-          {showNotifications && (
             <div
               ref={notifPanelRef}
-              className="glass-panel skeuo-soft absolute right-0 top-10 z-50 w-[22rem] overflow-hidden rounded-2xl border border-white/70 bg-white/88 shadow-2xl max-lg:fixed max-lg:left-3 max-lg:right-3 max-lg:top-20 max-lg:w-auto"
+              style={notifPanelStyle}
+              className="glass-panel skeuo-soft overflow-hidden rounded-2xl border border-white/70 bg-white/92 shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-[#DFE1E6]/70 px-3 py-2">
                 <p className="text-sm font-semibold text-[#172B4D]">
@@ -227,7 +265,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
                   <button
                     type="button"
                     onClick={() => setShowNotifications(false)}
-                    className="rounded p-1 text-[#6B778C] hover:bg-[#EBECF0]"
+                    className="rounded-lg p-1 text-[#6B778C] hover:bg-[#EBECF0]"
                     aria-label="Close notifications"
                   >
                     <X className="h-3.5 w-3.5" />
