@@ -12,10 +12,11 @@ import {
   Plus,
   Search,
   Settings,
+  X,
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "./ui/input";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -41,6 +42,8 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifLoading, setNotifLoading] = useState(false);
+  const notifPanelRef = useRef<HTMLDivElement | null>(null);
+  const notifButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -89,6 +92,30 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
     return () => window.clearInterval(timer);
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (notifPanelRef.current?.contains(target)) return;
+      if (notifButtonRef.current?.contains(target)) return;
+      setShowNotifications(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showNotifications]);
+
   const markNotificationRead = async (notificationId: string) => {
     try {
       await axiosInstance.put(`/api/notifications/${notificationId}/read?read=true`);
@@ -116,7 +143,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-64 items-center justify-center border-r bg-[#F4F5F7]">
+      <div className="glass-panel skeuo-soft flex h-screen w-64 items-center justify-center border-r border-white/70 bg-[#F4F5F7]/85">
         <span className="text-sm text-[#6B778C]">Loading projects...</span>
       </div>
     );
@@ -130,10 +157,22 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
     router.push("/login");
     onNavigate?.();
   };
+
+  const formatRelativeTime = (value?: string) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
   return (
     <div
       className={cn(
-        "flex h-screen w-64 flex-col border-r bg-[#F4F5F7] text-[#42526E]",
+        "glass-panel skeuo-soft flex h-screen w-64 flex-col border-r border-white/70 bg-[#F4F5F7]/85 text-[#42526E]",
         className,
       )}
     >
@@ -146,6 +185,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
         </span>
         <div className="ml-auto relative">
           <button
+            ref={notifButtonRef}
             type="button"
             onClick={() => {
               setShowNotifications((prev) => !prev);
@@ -153,7 +193,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
                 fetchNotifications();
               }
             }}
-            className="relative rounded p-1 text-[#42526E] hover:bg-[#EBECF0]"
+            className="skeuo-soft relative rounded-xl border border-white/80 bg-white/70 p-1.5 text-[#42526E] backdrop-blur-sm transition hover:bg-[#EBECF0]"
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
@@ -164,9 +204,37 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
             )}
           </button>
           {showNotifications && (
-            <div className="absolute right-0 top-8 z-50 w-[min(20rem,calc(100vw-2rem))] rounded border border-[#DFE1E6] bg-white shadow-lg">
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <p className="text-sm font-semibold text-[#172B4D]">Notifications</p>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-black/20 lg:hidden"
+              aria-label="Close notifications overlay"
+              onClick={() => setShowNotifications(false)}
+            />
+          )}
+          {showNotifications && (
+            <div
+              ref={notifPanelRef}
+              className="glass-panel skeuo-soft absolute right-0 top-10 z-50 w-[22rem] overflow-hidden rounded-2xl border border-white/70 bg-white/88 shadow-2xl max-lg:fixed max-lg:left-3 max-lg:right-3 max-lg:top-20 max-lg:w-auto"
+            >
+              <div className="flex items-center justify-between border-b border-[#DFE1E6]/70 px-3 py-2">
+                <p className="text-sm font-semibold text-[#172B4D]">
+                  Notifications
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-[#DEEBFF] px-2 py-0.5 text-[10px] font-semibold text-[#0052CC]">
+                    {unreadCount} unread
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotifications(false)}
+                    className="rounded p-1 text-[#6B778C] hover:bg-[#EBECF0]"
+                    aria-label="Close notifications"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2">
                 <button
                   type="button"
                   onClick={markAllNotificationsRead}
@@ -175,7 +243,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
                   Mark all read
                 </button>
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-80 overflow-y-auto px-2 pb-2">
                 {notifLoading ? (
                   <p className="px-3 py-3 text-xs text-[#6B778C]">Loading notifications...</p>
                 ) : notifications.length === 0 ? (
@@ -186,12 +254,19 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
                       key={item.id}
                       type="button"
                       onClick={() => !item.read && markNotificationRead(item.id)}
-                      className={`w-full border-b px-3 py-2 text-left hover:bg-[#F4F5F7] ${
-                        item.read ? "bg-white" : "bg-[#DEEBFF]/50"
+                      className={`mb-2 w-full rounded-xl border px-3 py-2 text-left transition hover:bg-[#F4F5F7] ${
+                        item.read
+                          ? "border-[#DFE1E6] bg-white/80"
+                          : "border-[#B3D4FF] bg-[#DEEBFF]/70"
                       }`}
                     >
-                      <p className="text-xs font-semibold text-[#172B4D]">{item.type}</p>
-                      <p className="text-xs text-[#42526E]">{item.message}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#172B4D]">
+                        {item.type}
+                      </p>
+                      <p className="mt-1 text-xs text-[#42526E]">{item.message}</p>
+                      <p className="mt-1 text-[11px] text-[#6B778C]">
+                        {formatRelativeTime(item.createdAt)}
+                      </p>
                     </button>
                   ))
                 )}
@@ -206,7 +281,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
           <div className="relative">
             <button
               onClick={() => setShowprojectmenu(!showprojectmenu)}
-              className="w-full rounded border border-[#DFE1E6] bg-white px-3 py-2 text-sm transition-colors hover:border-[#0052CC]"
+              className="skeuo-soft w-full rounded-xl border border-white/80 bg-white/75 px-3 py-2 text-sm transition-colors hover:border-[#0052CC]"
             >
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-blue-500" />
@@ -219,7 +294,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
               </div>
             </button>
             {showprojectmenu && (
-              <div className="absolute left-2 right-2 top-10 z-50 rounded border border-[#DFE1E6] bg-white shadow-lg">
+              <div className="glass-panel skeuo-soft absolute left-2 right-2 top-10 z-50 rounded-xl border border-white/70 bg-white/85 shadow-lg">
                 {project.map((project: any) => (
                   <button
                     key={project.id}
@@ -259,7 +334,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search..."
-              className="h-9 bg-white pl-8 focus-visible:ring-[#0052CC]"
+              className="skeuo-soft h-9 bg-white/75 pl-8 focus-visible:ring-[#0052CC]"
             />
           </div>
         </div>
@@ -311,7 +386,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
       </div>
       <div className="space-y-3 border-t p-4">
         {user && (
-          <div className="flex items-center gap-2 rounded bg-white px-2 py-2">
+          <div className="skeuo-soft flex items-center gap-2 rounded-xl bg-white/75 px-2 py-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={user?.avatar || "/placeholder.svg"} />
               <AvatarFallback className="bg-blue-100 text-blue-700">
@@ -327,7 +402,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
           </div>
         )}
         <Button
-          className="w-full justify-start gap-2 bg-[#0052CC] text-white hover:bg-[#0747A6]"
+          className="skeuo-soft w-full justify-start gap-2 bg-[#0052CC] text-white hover:bg-[#0747A6]"
           onClick={() => setShowcreateissuemodel(true)}
         >
           <Plus className="h-4 w-4" />
@@ -335,7 +410,7 @@ const Sidebar = ({ className, onNavigate }: SidebarProps) => {
         </Button>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-2 text-[#42526E] hover:bg-[#EBECF0]"
+          className="skeuo-soft w-full justify-start gap-2 text-[#42526E] hover:bg-[#EBECF0]"
           onClick={HandleLogout}
         >
           <LogOut className="h-4 w-4" />

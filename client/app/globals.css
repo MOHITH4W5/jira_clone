@@ -123,3 +123,120 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .glass-panel {
+    background: linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.78),
+      rgba(255, 255, 255, 0.6)
+    );
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .skeuo-soft {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 0 rgba(9, 30, 66, 0.08),
+      0 16px 36px -26px rgba(9, 30, 66, 0.55);
+  }
+
+  .skeuo-pill-btn {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      inset 0 -1px 0 rgba(9, 30, 66, 0.1),
+      0 8px 20px -16px rgba(9, 30, 66, 0.45);
+    transition: transform 220ms ease, box-shadow 220ms ease;
+  }
+
+  .skeuo-pill-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(9, 30, 66, 0.12),
+      0 10px 24px -14px rgba(9, 30, 66, 0.5);
+  }
+
+  .reveal-on-scroll {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.985);
+    filter: blur(5px);
+    transition:
+      opacity 560ms ease,
+      transform 560ms ease,
+      filter 560ms ease;
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  .reveal-on-scroll.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+
+  .text-reveal-scroll {
+    background-image: linear-gradient(95deg, #172b4d 35%, #0c66e4 62%, #172b4d 88%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: text-reveal-shimmer 5s ease-in-out infinite;
+  }
+
+  .parallax-orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(1px);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .parallax-orb-1 {
+    right: -80px;
+    top: -50px;
+    height: 240px;
+    width: 240px;
+    background: radial-gradient(
+      circle,
+      rgba(12, 102, 228, 0.2) 0%,
+      rgba(12, 102, 228, 0.03) 70%
+    );
+  }
+
+  .parallax-orb-2 {
+    left: -120px;
+    top: 220px;
+    height: 300px;
+    width: 300px;
+    background: radial-gradient(
+      circle,
+      rgba(54, 179, 126, 0.18) 0%,
+      rgba(54, 179, 126, 0.03) 70%
+    );
+  }
+
+  @keyframes text-reveal-shimmer {
+    0% {
+      background-position: 0% 0%;
+    }
+    50% {
+      background-position: 100% 0%;
+    }
+    100% {
+      background-position: 0% 0%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .skeuo-pill-btn,
+  .text-reveal-scroll {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}
